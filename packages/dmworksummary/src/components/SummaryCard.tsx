@@ -4,7 +4,6 @@ import { IconDelete } from "@douyinfe/semi-icons";
 import WKApp from "@octo/base/src/App";
 import type { SummaryListItem } from "../types/summary";
 import { ParticipantStatus } from "../types/summary";
-import { getModeLabel, formatDate } from "../utils/summaryHelpers";
 import TaskStatusBadge from "./TaskStatusBadge";
 
 interface SummaryCardProps {
@@ -15,12 +14,6 @@ interface SummaryCardProps {
 }
 
 const SummaryCard: React.FC<SummaryCardProps> = ({ task, onClick, onDelete, onRespond }) => {
-    const sourcesSummary = task.sources
-        .slice(0, 3)
-        .map((s) => s.source_name || s.source_id)
-        .join("、");
-    const extraCount = task.sources.length > 3 ? `等 ${task.sources.length} 个来源` : "";
-
     const currentUid = WKApp.loginInfo.uid;
     const myParticipant = task.participants?.find((p) => p.user_id === currentUid);
     const isPendingInvite = myParticipant != null && myParticipant.status === ParticipantStatus.PENDING;
@@ -34,11 +27,6 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ task, onClick, onDelete, onRe
                 <TaskStatusBadge status={task.status} />
             </div>
 
-            {task.sources.length > 0 && (
-                <div className="summary-card-sources">
-                    来源：{sourcesSummary}{extraCount}
-                </div>
-            )}
             {isPendingInvite && onRespond && (
                 <div
                     className="summary-card-respond"
