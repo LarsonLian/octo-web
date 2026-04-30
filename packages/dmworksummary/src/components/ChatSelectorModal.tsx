@@ -182,7 +182,12 @@ export default class ChatSelectorModal extends Component<Props, State> {
             >
                 <Checkbox checked={checked} disabled={disabled} style={{ marginRight: 10 }} />
                 <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: indent ? 13 : 14 }}>{item.name}</div>
+                    <div style={{ fontSize: indent ? 13 : 14, display: "flex", alignItems: "center" }}>
+                        {item.name}
+                        {item.chat_type === "direct" && item.is_bot && (
+                            <Tag size="small" color="purple" style={{ marginLeft: 4 }}>AI</Tag>
+                        )}
+                    </div>
                     {item.member_count !== null && (
                         <div style={{ fontSize: 12, color: "var(--semi-color-text-2)" }}>
                             {item.member_count} 人
