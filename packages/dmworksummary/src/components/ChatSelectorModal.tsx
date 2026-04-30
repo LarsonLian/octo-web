@@ -3,6 +3,7 @@ import { Modal, Input, Tabs, TabPane, Checkbox, Button, Spin, Empty, Tag } from 
 import { IconSearch } from "@douyinfe/semi-icons";
 import type { ChatCandidate } from "../types/summary";
 import * as api from "../api/summaryApi";
+import AiBadge from "@octo/base/src/Components/AiBadge";
 
 interface Props {
     visible: boolean;
@@ -185,7 +186,7 @@ export default class ChatSelectorModal extends Component<Props, State> {
                     <div style={{ fontSize: indent ? 13 : 14, display: "flex", alignItems: "center" }}>
                         {item.name}
                         {item.chat_type === "direct" && item.is_bot && (
-                            <Tag size="small" color="purple" style={{ marginLeft: 4 }}>AI</Tag>
+                            <span style={{ marginLeft: 4 }}><AiBadge size="small" /></span>
                         )}
                     </div>
                     {item.member_count !== null && (
