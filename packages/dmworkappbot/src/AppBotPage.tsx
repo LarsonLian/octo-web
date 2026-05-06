@@ -14,6 +14,21 @@ interface AppBotInfo {
 
 type LoadState = "loading" | "ready" | "error"
 
+// Default bot avatar as SVG data URI — used when bot.avatar is empty.
+// This ensures avatarChannel() uses this instead of falling back to
+// /users/{uid}/avatar (which returns 404 for bot UIDs).
+const BOT_DEFAULT_AVATAR_DATA_URI = "data:image/svg+xml," + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">'
+  + '<rect width="80" height="80" rx="16" fill="#667eea"/>'
+  + '<rect x="14" y="26" width="52" height="40" rx="10" stroke="white" stroke-width="3" fill="rgba(255,255,255,0.2)"/>'
+  + '<circle cx="30" cy="46" r="5" fill="white"/>'
+  + '<circle cx="50" cy="46" r="5" fill="white"/>'
+  + '<path d="M32 56c2 4 5 6 8 6s6-2 8-6" stroke="white" stroke-width="3" stroke-linecap="round" fill="none"/>'
+  + '<line x1="40" y1="12" x2="40" y2="26" stroke="white" stroke-width="3" stroke-linecap="round"/>'
+  + '<circle cx="40" cy="10" r="5" fill="white"/>'
+  + '</svg>'
+)
+
 const AVATAR_GRADIENTS = [
   "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
   "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
@@ -149,7 +164,9 @@ export default function AppBotPage() {
     const info = new ChannelInfo()
     info.channel = channel
     info.title = bot.display_name
-    info.logo = bot.avatar || ""
+    // When bot has no avatar, use a data URI so avatarChannel() uses it
+    // instead of falling back to /users/{uid}/avatar (which 404s for bots)
+    info.logo = bot.avatar || BOT_DEFAULT_AVATAR_DATA_URI
     info.orgData = { displayName: bot.display_name, robot: 1, name: bot.display_name }
     WKSDK.shared().channelManager.setChannleInfoForCache(info)
 
