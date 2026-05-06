@@ -12,33 +12,60 @@ interface AppBotInfo {
   scope: "platform" | "space"
 }
 
+/** Validate that a URL uses a safe protocol (http/https only). */
+function isSafeImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url, window.location.origin)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
 export default function AppBotList() {
   const [bots, setBots] = useState<AppBotInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadData = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const spaceId = WKApp.shared.currentSpaceId
-      const params = spaceId ? { param: { space_id: spaceId } } : undefined
-      const res = await WKApp.apiClient.get("/app_bot/available", params)
-      setBots(res || [])
-    } catch (err) {
-      console.warn('[AppBotList] Failed to load bots:', err)
-      setError('加载失败，请稍后重试')
-      setBots([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
+    let stale = false
+
+    const loadData = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const spaceId = WKApp.shared.currentSpaceId
+        const params = spaceId ? { param: { space_id: spaceId } } : undefined
+        const res = await WKApp.apiClient.get("/app_bot/available", params)
+        if (!stale) {
+          setBots(res || [])
+        }
+      } catch (err) {
+        console.warn('[AppBotList] Failed to load bots:', err)
+        if (!stale) {
+          setError('加载失败，请稍后重试')
+          setBots([])
+        }
+      } finally {
+        if (!stale) {
+          setLoading(false)
+        }
+      }
+    }
+
     loadData()
-    const handler = () => loadData()
+
+    const handler = () => {
+      // Reset stale flag for new loads triggered by space change
+      stale = false
+      loadData()
+    }
     WKApp.mittBus.on("space-changed", handler)
-    return () => { WKApp.mittBus.off("space-changed", handler) }
+
+    return () => {
+      stale = true
+      WKApp.mittBus.off("space-changed", handler)
+    }
   }, [])
 
   const openChat = (bot: AppBotInfo) => {
@@ -55,7 +82,10 @@ export default function AppBotList() {
         <div className="appbot-empty">
           <div className="appbot-empty-icon">⚠️</div>
           <div className="appbot-empty-text">{error}</div>
-          <button className="appbot-retry-btn" onClick={loadData}>重试</button>
+          <button className="appbot-retry-btn" onClick={() => {
+            // Trigger space-changed to reload (reuses existing handler)
+            WKApp.mittBus.emit("space-changed")
+          }}>重试</button>
         </div>
       </div>
     )
@@ -79,7 +109,7 @@ export default function AppBotList() {
         {bots.map((bot) => (
           <div key={bot.id} className="appbot-item" onClick={() => openChat(bot)}>
             <div className="appbot-avatar">
-              {bot.avatar
+              {bot.avatar && isSafeImageUrl(bot.avatar)
                 ? <img src={bot.avatar} alt={bot.display_name} />
                 : <span>{bot.display_name?.charAt(0)?.toUpperCase() || "A"}</span>
               }

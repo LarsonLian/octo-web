@@ -11,12 +11,25 @@ const AppBotIcon: React.FC<{ active?: boolean }> = ({ active }) => (
   </svg>
 )
 
+/** Guard against double-init (HMR in dev or future module lifecycle changes). */
+let _initialized = false
+
+// Reset on HMR: tear down old listeners, reset init guard.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    _initialized = false
+  })
+}
+
 export default class AppBotModule implements IModule {
   id(): string {
     return "AppBotModule"
   }
 
   init(): void {
+    if (_initialized) return
+    _initialized = true
+
     // Register route
     WKApp.route.register("/appbot", () => <AppBotList />)
 
