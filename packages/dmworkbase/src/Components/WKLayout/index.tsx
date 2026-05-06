@@ -177,18 +177,16 @@ export class WKLayout extends Component<WKLayoutProps, WKLayoutState>{
                     {contentLeft}
                 </WKViewQueue>
             </div>
-            {!fullWidth && (
-                <div className="wk-layout-content-right">
-                    <WKViewQueue onContext={(context) => {
-                        this.rightContext = context
-                        if(onRightContext) {
-                            onRightContext(context)
-                        }
-                    }}>
-                        {contentRight}
-                    </WKViewQueue>
-                </div>
-            )}
+            <div className="wk-layout-content-right" style={fullWidth ? { display: 'none' } : undefined}>
+                <WKViewQueue onContext={(context) => {
+                    this.rightContext = context
+                    if(onRightContext) {
+                        onRightContext(context)
+                    }
+                }}>
+                    {contentRight}
+                </WKViewQueue>
+            </div>
             {/* Draggable splitter — absolutely positioned, hidden on small screens or fullWidth */}
             {!fullWidth && (
                 <div
