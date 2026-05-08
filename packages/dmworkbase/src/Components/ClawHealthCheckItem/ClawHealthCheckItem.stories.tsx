@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import HealthCheckItem from './index';
+import ClawHealthCheckItem from './ClawHealthCheckItem';
 
 const meta = {
-  title: 'Components/HealthCheckItem',
-  component: HealthCheckItem,
+  title: 'Components/ClawHealthCheckItem',
+  component: ClawHealthCheckItem,
   parameters: {
     layout: 'centered',
   },
@@ -23,7 +23,7 @@ const meta = {
       description: '检查项数值',
     },
   },
-} satisfies Meta<typeof HealthCheckItem>;
+} satisfies Meta<typeof ClawHealthCheckItem>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -68,22 +68,22 @@ export const Error: Story = {
 export const MultipleStates: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="Node.js 环境"
         value="v24.11.1"
       />
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="主机架构"
         value="ARM64"
       />
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="warning"
         label="端口可用"
         value="60418"
       />
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="error"
         label="可写磁盘空间"
         value="0.8 GB"
@@ -103,37 +103,37 @@ export const GridLayout: Story = {
         maxWidth: '800px',
       }}
     >
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="OpenClaw 进程"
         value="正常"
       />
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="Gateway 连接"
         value="已连接"
       />
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="Node.js 环境"
         value="v24.11.1"
       />
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="主机架构"
         value="ARM64"
       />
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="可写磁盘空间"
         value="68.0 GB"
       />
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="端口可用"
         value="60418"
       />
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="warning"
         label="网络连接"
         value="472.76ms"

@@ -1,9 +1,9 @@
 import React from 'react';
-import './HealthCheckItem.css';
+import './ClawHealthCheckItem.css';
 
 export type HealthStatus = 'success' | 'warning' | 'error';
 
-export interface HealthCheckItemProps {
+export interface ClawHealthCheckItemProps {
   /** 健康检查项状态：success(绿), warning(黄), error(红) */
   status: HealthStatus;
   /** 检查项标签 */
@@ -20,12 +20,12 @@ export interface HealthCheckItemProps {
  * 健康检查单项组件
  * 用于展示单个健康检查项的状态、标签和值
  */
-const HealthCheckItem: React.FC<HealthCheckItemProps> = ({
+const ClawHealthCheckItem: React.FC<ClawHealthCheckItemProps> = ({
   status,
   label,
   value,
   className = '',
-  'data-testid': testId = 'health-check-item',
+  'data-testid': testId = 'claw-health-check-item',
 }) => {
   return (
     <div
@@ -52,4 +52,4 @@ const HealthCheckItem: React.FC<HealthCheckItemProps> = ({
   );
 };
 
-export default HealthCheckItem;
+export default ClawHealthCheckItem;

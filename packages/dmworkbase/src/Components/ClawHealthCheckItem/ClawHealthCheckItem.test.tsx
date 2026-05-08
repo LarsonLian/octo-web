@@ -1,65 +1,65 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import HealthCheckItem from './index';
+import ClawHealthCheckItem from './ClawHealthCheckItem';
 
-describe('HealthCheckItem', () => {
+describe('ClawHealthCheckItem', () => {
   it('renders with basic props', () => {
     render(
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="OpenClaw 进程"
         value="正常"
       />
     );
 
-    expect(screen.getByTestId('health-check-item')).toBeInTheDocument();
-    expect(screen.getByTestId('health-check-item-label')).toHaveTextContent('OpenClaw 进程');
-    expect(screen.getByTestId('health-check-item-value')).toHaveTextContent('正常');
+    expect(screen.getByTestId('claw-health-check-item')).toBeInTheDocument();
+    expect(screen.getByTestId('claw-health-check-item-label')).toHaveTextContent('OpenClaw 进程');
+    expect(screen.getByTestId('claw-health-check-item-value')).toHaveTextContent('正常');
   });
 
   it('renders success status with green dot', () => {
     render(
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="Gateway 连接"
         value="已连接"
       />
     );
 
-    const dot = screen.getByTestId('health-check-item-dot');
+    const dot = screen.getByTestId('claw-health-check-item-dot');
     expect(dot).toHaveClass('hc-dot--success');
   });
 
   it('renders warning status with yellow dot', () => {
     render(
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="warning"
         label="网络连接"
         value="472.76ms"
       />
     );
 
-    const dot = screen.getByTestId('health-check-item-dot');
+    const dot = screen.getByTestId('claw-health-check-item-dot');
     expect(dot).toHaveClass('hc-dot--warning');
   });
 
   it('renders error status with red dot', () => {
     render(
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="error"
         label="磁盘空间"
         value="不足 1GB"
       />
     );
 
-    const dot = screen.getByTestId('health-check-item-dot');
+    const dot = screen.getByTestId('claw-health-check-item-dot');
     expect(dot).toHaveClass('hc-dot--error');
   });
 
   it('accepts custom className', () => {
     render(
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="测试"
         value="通过"
@@ -67,14 +67,14 @@ describe('HealthCheckItem', () => {
       />
     );
 
-    const item = screen.getByTestId('health-check-item');
+    const item = screen.getByTestId('claw-health-check-item');
     expect(item).toHaveClass('health-chip');
     expect(item).toHaveClass('custom-class');
   });
 
   it('accepts custom data-testid', () => {
     render(
-      <HealthCheckItem
+      <ClawHealthCheckItem
         status="success"
         label="测试"
         value="通过"
@@ -90,14 +90,14 @@ describe('HealthCheckItem', () => {
 
   it('renders all three status types correctly', () => {
     const { rerender } = render(
-      <HealthCheckItem status="success" label="Test" value="OK" />
+      <ClawHealthCheckItem status="success" label="Test" value="OK" />
     );
-    expect(screen.getByTestId('health-check-item-dot')).toHaveClass('hc-dot--success');
+    expect(screen.getByTestId('claw-health-check-item-dot')).toHaveClass('hc-dot--success');
 
-    rerender(<HealthCheckItem status="warning" label="Test" value="OK" />);
-    expect(screen.getByTestId('health-check-item-dot')).toHaveClass('hc-dot--warning');
+    rerender(<ClawHealthCheckItem status="warning" label="Test" value="OK" />);
+    expect(screen.getByTestId('claw-health-check-item-dot')).toHaveClass('hc-dot--warning');
 
-    rerender(<HealthCheckItem status="error" label="Test" value="OK" />);
-    expect(screen.getByTestId('health-check-item-dot')).toHaveClass('hc-dot--error');
+    rerender(<ClawHealthCheckItem status="error" label="Test" value="OK" />);
+    expect(screen.getByTestId('claw-health-check-item-dot')).toHaveClass('hc-dot--error');
   });
 });

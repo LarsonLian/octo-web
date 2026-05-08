@@ -1,15 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import SessionItem from "./index";
+import ClawSessionItem from "./ClawSessionItem";
 
 /**
- * SessionItem - Session 展示卡片
+ * ClawSessionItem - Session 展示卡片
  *
  * 用于展示会话信息，包含对话方、模型、上下文使用情况等。
  * 支持折叠/展开，RUNNING 状态有强视觉标记。
  */
-const meta: Meta<typeof SessionItem> = {
-  title: "Components/SessionItem",
-  component: SessionItem,
+const meta: Meta<typeof ClawSessionItem> = {
+  title: "Components/ClawSessionItem",
+  component: ClawSessionItem,
   parameters: {
     layout: "padded",
     docs: {
@@ -23,7 +23,7 @@ const meta: Meta<typeof SessionItem> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof SessionItem>;
+type Story = StoryObj<typeof ClawSessionItem>;
 
 /**
  * 默认状态（活跃，非 RUNNING）

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import "./SessionItem.css";
+import "./ClawSessionItem.css";
 
-export interface SessionItemProps {
+export interface ClawSessionItemProps {
   /** Session 数据 */
   session: {
     /** Session key（如 octo:c_pipi_lux_01） */
@@ -28,14 +28,14 @@ export interface SessionItemProps {
 }
 
 /**
- * SessionItem - Session 展示卡片组件
+ * ClawSessionItem - Session 展示卡片组件
  *
  * AC-5: 展示对话方、模型、上下文、最近消息
  * AC-6: RUNNING 状态强视觉标记（绿色左边框 + 渐变背景）
  * AC-7: 点击表头展开/收起
  * AC-8: 上下文进度条 > 70% 显示警告色
  */
-export default function SessionItem({ session }: SessionItemProps) {
+export default function ClawSessionItem({ session }: ClawSessionItemProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   const {
@@ -70,17 +70,17 @@ export default function SessionItem({ session }: SessionItemProps) {
       className={`wk-session-card ${running ? "is-running" : ""} ${
         collapsed ? "collapsed" : ""
       }`}
-      data-testid="session-card"
+      data-testid="claw-session-card"
     >
       {/* 头部（点击展开/收起） */}
       <div
         className="wk-session-head"
         onClick={() => setCollapsed(!collapsed)}
-        data-testid="session-head"
+        data-testid="claw-session-head"
       >
         {/* RUNNING 徽章（仅 running=true 时显示） */}
         {running && (
-          <span className="wk-running-badge" data-testid="running-badge">
+          <span className="wk-running-badge" data-testid="claw-running-badge">
             RUNNING
           </span>
         )}
@@ -88,13 +88,13 @@ export default function SessionItem({ session }: SessionItemProps) {
         {/* 渠道标签 */}
         <span
           className={`wk-channel-chip wk-channel-${channelClass}`}
-          data-testid="channel-chip"
+          data-testid="claw-channel-chip"
         >
           {channel}
         </span>
 
         {/* Session Key */}
-        <span className="wk-session-key" data-testid="session-key">
+        <span className="wk-session-key" data-testid="claw-session-key">
           {key}
         </span>
 
@@ -109,7 +109,7 @@ export default function SessionItem({ session }: SessionItemProps) {
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          data-testid="session-chevron"
+          data-testid="claw-session-chevron"
         >
           <path d="m6 9 6 6 6-6" />
         </svg>
@@ -118,13 +118,13 @@ export default function SessionItem({ session }: SessionItemProps) {
       {/* 主体（可折叠） */}
       {!collapsed && (
         <>
-          <div className="wk-session-body" data-testid="session-body">
+          <div className="wk-session-body" data-testid="claw-session-body">
             {/* 对话方 */}
             <div className="wk-session-field">
               <span className="wk-session-field__label">对话方</span>
               <span
                 className="wk-session-field__value wk-session-field__value--normal"
-                data-testid="session-party"
+                data-testid="claw-session-party"
               >
                 {party}
               </span>
@@ -135,7 +135,7 @@ export default function SessionItem({ session }: SessionItemProps) {
               <span className="wk-session-field__label">模型</span>
               <span
                 className="wk-session-field__value"
-                data-testid="session-model"
+                data-testid="claw-session-model"
               >
                 {model}
               </span>
@@ -146,7 +146,7 @@ export default function SessionItem({ session }: SessionItemProps) {
               <span className="wk-session-field__label">SESSION ID</span>
               <span
                 className="wk-session-field__value"
-                data-testid="session-id"
+                data-testid="claw-session-id"
               >
                 {sessionId}
               </span>
@@ -155,7 +155,7 @@ export default function SessionItem({ session }: SessionItemProps) {
             {/* 上下文窗口（占满 3 列） */}
             <div className="wk-session-field wk-session-field--full">
               <span className="wk-session-field__label">上下文窗口</span>
-              <div className="wk-context-bar" data-testid="context-bar">
+              <div className="wk-context-bar" data-testid="claw-context-bar">
                 {/* 进度条轨道 */}
                 <div className="wk-context-bar__track">
                   <div
@@ -163,13 +163,13 @@ export default function SessionItem({ session }: SessionItemProps) {
                       isHighCtx ? "warn" : ""
                     }`}
                     style={{ width: `${ctxPercent}%` }}
-                    data-testid="context-bar-fill"
+                    data-testid="claw-context-bar-fill"
                   />
                 </div>
                 {/* 百分比文本 */}
                 <span
                   className="wk-context-bar__text"
-                  data-testid="context-bar-text"
+                  data-testid="claw-context-bar-text"
                 >
                   {(ctxUsed / 1000).toFixed(1)}K / {(ctxMax / 1000).toFixed(0)}
                   K ({ctxPercent}%)
@@ -179,7 +179,7 @@ export default function SessionItem({ session }: SessionItemProps) {
           </div>
 
           {/* 最近消息 */}
-          <div className="wk-session-msg" data-testid="session-msg">
+          <div className="wk-session-msg" data-testid="claw-session-msg">
             <span className="wk-session-msg__label">最近用户消息</span>
             <span className="wk-session-msg__content">{lastMsg}</span>
           </div>

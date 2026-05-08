@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import ConfigItem from "./index";
+import ClawConfigItem from "./ClawConfigItem";
 import {
     Monitor,
     Cpu,
@@ -12,8 +12,8 @@ import {
 } from "lucide-react";
 
 const meta = {
-    title: "Components/ConfigItem",
-    component: ConfigItem,
+    title: "Components/ClawConfigItem",
+    component: ClawConfigItem,
     parameters: {
         layout: "centered",
     },
@@ -32,7 +32,7 @@ const meta = {
             control: "text",
         },
     },
-} satisfies Meta<typeof ConfigItem>;
+} satisfies Meta<typeof ClawConfigItem>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -141,14 +141,14 @@ export const GridLayout: Story = {
                 border: "1px solid rgba(0,0,0,0.08)",
             }}
         >
-            <ConfigItem icon={<Monitor />} label="系统版本" value="macOS 13.2.1" />
-            <ConfigItem icon={<Cpu />} label="处理器架构" value="arm64" />
-            <ConfigItem icon={<HardDrive />} label="可写磁盘空间" value="68.0 GB" />
-            <ConfigItem icon={<FolderOpen />} label="应用数据目录" value=".octopush/octopush-58d651" />
-            <ConfigItem icon={<Package />} label="Claw 安装版本" value="v2026.4.11" />
-            <ConfigItem icon={<Activity />} label="使用端口" value="60418" />
-            <ConfigItem icon={<Globe />} label="后台地址" value="http://localhost:3100" />
-            <ConfigItem icon={<Users />} label="积分来源团队" value="DeepMiner Team" />
+            <ClawConfigItem icon={<Monitor />} label="系统版本" value="macOS 13.2.1" />
+            <ClawConfigItem icon={<Cpu />} label="处理器架构" value="arm64" />
+            <ClawConfigItem icon={<HardDrive />} label="可写磁盘空间" value="68.0 GB" />
+            <ClawConfigItem icon={<FolderOpen />} label="应用数据目录" value=".octopush/octopush-58d651" />
+            <ClawConfigItem icon={<Package />} label="Claw 安装版本" value="v2026.4.11" />
+            <ClawConfigItem icon={<Activity />} label="使用端口" value="60418" />
+            <ClawConfigItem icon={<Globe />} label="后台地址" value="http://localhost:3100" />
+            <ClawConfigItem icon={<Users />} label="积分来源团队" value="DeepMiner Team" />
         </div>
     ),
 };
