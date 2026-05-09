@@ -17,10 +17,14 @@
 /* ─── Header ─────────────────────────────────────────── */
 
 .wk-mp-page-sidebar__header {
-  padding: var(--wk-sp-4) var(--wk-sp-4) var(--wk-sp-2);
+  height: var(--wk-height-chat-conversation-header, 48px);
+  min-height: var(--wk-height-chat-conversation-header, 48px);
+  padding: 0 var(--wk-sp-4);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  border-bottom: 1px solid var(--wk-brand-tint-08, #e4e4e7);
+  box-sizing: border-box;
 }
 
 .wk-mp-page-sidebar__title {
