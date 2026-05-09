@@ -207,8 +207,6 @@ export default function ClawSessionItem({ session }: ClawSessionItemProps) {
               </div>
             </div>
           </div>
-
-
         </>
       )}
     </div>

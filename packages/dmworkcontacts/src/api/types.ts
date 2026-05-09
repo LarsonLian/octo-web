@@ -150,7 +150,10 @@ export interface AgentCardData {
 }
 
 /**
- * Agent Card API 响应
+ * Agent Card API 响应（HTTP 层封装）
+ * 
+ * 注意：这是完整的 HTTP 响应结构 { code, message, data }
+ * 与 AgentCardService 中的 AgentCardResponse 别名不同，后者仅指 data 载荷
  */
 export interface AgentCardResponse {
   code: number;
