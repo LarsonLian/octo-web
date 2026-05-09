@@ -89,7 +89,7 @@ class MatterLinkMenu extends Component<MatterLinkMenuProps> {
         <button
           type="button"
           className="wk-matter-link-menu__item wk-matter-link-menu__item--primary"
-          disabled={disabled || !onCreate}
+          disabled={!onCreate}
           onClick={() => {
             if (onCreate) onCreate();
             onClose();
