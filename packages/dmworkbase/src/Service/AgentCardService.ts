@@ -7,14 +7,14 @@ import type {
   CoreFile,
   MemoryFile,
   FileContentData,
-} from '@octo/contacts';
+} from '../Types/AgentCard';
 
 /**
  * AgentCardService
  * 
  * 封装 agent-card-server 接口调用，获取 Agent 运行时信息
  * 
- * 类型定义统一使用 @octo/contacts/api/types
+ * 类型定义来自 ../Types/AgentCard（打破循环依赖）
  */
 
 /** 文件分组 */
