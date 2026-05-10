@@ -697,6 +697,14 @@ export default class ConversationList extends Component<
 
   filterConversation(conv: ConversationWrap): boolean {
     const filter = this.props.filter ?? "all";
+
+    // App Bot (uid matches app_*_bot) has a dedicated AppBotPage entry;
+    // hide from all conversation list tabs to avoid duplication.
+    const uid = conv.channel.channelID;
+    if (conv.channel.channelType === ChannelTypePerson && /^app_.+_bot$/.test(uid)) {
+      return false;
+    }
+
     if (filter === "all") return true;
     const channelInfo = conv.channelInfo;
     // 群组和子区频道都归类到 group 过滤器
