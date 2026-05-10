@@ -17,7 +17,9 @@
 //   必须把本站的 return_to 回跳 URL 一并拼进 query,否则用户在 Aegis 实名完成后
 //   会卡在 Aegis 页回不来,整个实名链路在 UX 上断掉。return_to 通过 query 参数
 //   `return_to=<encoded>` 传给 Aegis,Aegis 完成后 302 回本站 `?verified=1`,由
-//   MeInfoVM.didMount 的 ?verified=1 handler + pull-from-aegis endpoint 闭环。
+//   MeInfoVM.didMount 的 ?verified=1 handler + 全局 useRealnameVerifiedLandingHandler
+//   触发 reloadSelfProfile 闭环(YUJ-406: pull-from-aegis 已废弃, 实名同步改走
+//   dmworkim sync_worker 15min 轮询)。
 
 import type { OidcProviderConfig } from "../../Service/OidcConfig";
 

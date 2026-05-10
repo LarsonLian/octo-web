@@ -1,5 +1,5 @@
 /**
- * YUJ-398 · MeInfoVM 行为测试
+ * MeInfoVM 行为测试
  *
  * 覆盖 Issue 任务 A 单测合同(resolveRealnameVerifyUrl 的 URL 拼接 + provider 分支
  * 已在 realnameVerifyUrl.test.ts 覆盖;本 suite 专注 vm.tsx 里的副作用层):
@@ -8,8 +8,11 @@
  *   2. startRealnameVerify: local 账号 Toast 不跳(保留 YUJ-396 行为)
  *   3. startRealnameVerify: 弹窗被拦截(window.open 返 null)→ toast warning,
  *      不自动替换当前 tab
- *   4. didMount 无条件调 pull-from-aegis(YUJ-398 ③ opportunistic refresh)
- *   5. didMount 的 ?verified=1 回跳流程 → URL 清理 + pull-from-aegis
+ *   4. didMount: ?verified=1 回跳流程 → URL 清理 + reloadSelfProfile
+ *   5. didMount: 无 ?verified=1 → 仅 reloadSelfProfile, 不再 POST 任何 endpoint
+ *
+ * YUJ-406:dmworkim 的 POST /v1/internal/realname/pull-from-aegis endpoint 已废弃。
+ * 前端 didMount 不再调该 endpoint(实名同步改走 dmworkim sync_worker 15min 轮询)。
  *
  * 实现注意:vm.tsx 会 import 大量重依赖(WKSDK / axios / wukongimjssdk / semi-ui),
  * 靠 vitest 的 vi.mock + vi.hoisted 在 import 前替换掉无关模块,仅保留业务核心。
@@ -193,7 +196,7 @@ describe("MeInfoVM.startRealnameVerify — YUJ-398 window.open + return_to 合�
 
   // YUJ-398 Round 1 (Jerry-Xin Crit):return_to 必须保留当前 URL 所有 query 参数,
   // 尤其 sid。登录态按 sid 分桶,丢 sid → Aegis 回跳后 App.getSID 读空 bucket →
-  // token 拿不到 → pull-from-aegis 无鉴权 → P0 闭环仍断。
+  // token 拿不到 → 后续 /users/{uid} 刷新无鉴权 → 实名状态读不到。
   //
   // YUJ-402:verify URL 现在写到 openedMock.location.href(先 about:blank 再导航),
   // 断言改查 mock window 的 location.href,而不是 window.open 第一实参。
@@ -362,7 +365,7 @@ describe("MeInfoVM.startRealnameVerify — YUJ-398 window.open + return_to 合�
   })
 })
 
-describe("MeInfoVM.didMount — YUJ-398 opportunistic pull-from-aegis", () => {
+describe("MeInfoVM.didMount — YUJ-406 reloadSelfProfile only (pull-from-aegis endpoint decommissioned)", () => {
   const originalLocation = window.location
 
   beforeEach(() => {
@@ -379,7 +382,7 @@ describe("MeInfoVM.didMount — YUJ-398 opportunistic pull-from-aegis", () => {
     Object.defineProperty(window, "location", { configurable: true, value: originalLocation })
   })
 
-  it("无 ?verified=1 → 无条件调一次 pull-from-aegis(dormant user 兜底)", async () => {
+  it("无 ?verified=1 → 仅 reloadSelfProfile,绝不 POST 任何 endpoint(YUJ-406 pull-from-aegis 已废弃)", async () => {
     Object.defineProperty(window, "location", {
       configurable: true,
       value: {
@@ -394,19 +397,23 @@ describe("MeInfoVM.didMount — YUJ-398 opportunistic pull-from-aegis", () => {
 
     const vm = new MeInfoVM()
     vm.didMount()
-    // 给 promise 微任务一轮时间
+    // 给 promise 微任务几轮时间把 reloadSelfProfile 跑完
+    await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()
 
+    // didMount 的 reloadSelfProfile 会 GET /users/uid-1
+    expect(hoisted.apiClientGet).toHaveBeenCalledWith("users/uid-1")
+    // YUJ-406 硬约束:不再对 pull-from-aegis 发 POST(dmworkim 侧 endpoint 已废弃)
     const pullCalls = hoisted.apiClientPost.mock.calls.filter(
       (args) => args[0] === "internal/realname/pull-from-aegis",
     )
-    expect(pullCalls.length).toBeGreaterThanOrEqual(1)
-    // didMount 最初的 reloadSelfProfile 会 GET /users/uid-1
-    expect(hoisted.apiClientGet).toHaveBeenCalledWith("users/uid-1")
+    expect(pullCalls).toHaveLength(0)
+    // 也不应调用任何其它 POST(防回归)
+    expect(hoisted.apiClientPost).not.toHaveBeenCalled()
   })
 
-  it("?verified=1 → 清除 URL 参数 + 触发 pull-from-aegis(回跳路径也走新端点)", async () => {
+  it("?verified=1 → 清除 URL 参数 + reloadSelfProfile,不调 pull-from-aegis", async () => {
     const replaceStateSpy = vi.fn()
     Object.defineProperty(window, "location", {
       configurable: true,
@@ -428,125 +435,50 @@ describe("MeInfoVM.didMount — YUJ-398 opportunistic pull-from-aegis", () => {
     vm.didMount()
     await Promise.resolve()
     await Promise.resolve()
+    await Promise.resolve()
 
     // URL 清理必须把 ?verified=1 清掉,避免二次进入重复触发
     expect(replaceStateSpy).toHaveBeenCalledTimes(1)
     const [, , newUrl] = replaceStateSpy.mock.calls[0]
     expect(newUrl).not.toContain("verified=1")
 
-    // pull-from-aegis 被调至少 1 次
+    // reloadSelfProfile 一次 GET
+    expect(
+      hoisted.apiClientGet.mock.calls.filter((args) => args[0] === "users/uid-1"),
+    ).toHaveLength(1)
+
+    // YUJ-406 硬约束:回跳路径上也不再 POST pull-from-aegis
     const pullCalls = hoisted.apiClientPost.mock.calls.filter(
       (args) => args[0] === "internal/realname/pull-from-aegis",
     )
-    expect(pullCalls.length).toBeGreaterThanOrEqual(1)
+    expect(pullCalls).toHaveLength(0)
   })
 
-  // YUJ-398 Round 2 Warning(Jerry-Xin):didMount 三段异步无序 → stale GET 覆盖竞态。
-  // 新实现串行化:pull-from-aegis → reloadSelfProfile,保证只一次 GET 且在 pull 之后。
-  it("[Warning] didMount 只发一次 GET /users/{uid},且在 pull-from-aegis 之后(防 stale GET 覆盖)", async () => {
+  it("?verified=1 回跳保留其他 query 参数(sid 等),只删 verified", async () => {
+    const replaceStateSpy = vi.fn()
     Object.defineProperty(window, "location", {
       configurable: true,
       value: {
         ...originalLocation,
-        search: "?sid=abc",
+        search: "?sid=abc&verified=1",
         pathname: "/me",
         origin: "https://x",
         hash: "",
-        href: "https://x/me?sid=abc",
+        href: "https://x/me?sid=abc&verified=1",
       },
     })
-    // 记录调用顺序
-    const callOrder: string[] = []
-    hoisted.apiClientPost.mockImplementation((path: string) => {
-      callOrder.push(`POST ${path}`)
-      return Promise.resolve({})
-    })
-    hoisted.apiClientGet.mockImplementation((path: string) => {
-      callOrder.push(`GET ${path}`)
-      return Promise.resolve({ realname_verified: true, real_name: "张三" })
-    })
-
-    const vm = new MeInfoVM()
-    await vm.initProfileSequence()
-
-    // 断言 1:恰好一次 GET /users/uid-1
-    const getCalls = hoisted.apiClientGet.mock.calls.filter(
-      (args) => args[0] === "users/uid-1",
-    )
-    expect(getCalls).toHaveLength(1)
-
-    // 断言 2:POST pull-from-aegis 在 GET /users/uid-1 之前
-    const pullIdx = callOrder.indexOf("POST internal/realname/pull-from-aegis")
-    const getIdx = callOrder.indexOf("GET users/uid-1")
-    expect(pullIdx).toBeGreaterThanOrEqual(0)
-    expect(getIdx).toBeGreaterThanOrEqual(0)
-    expect(pullIdx).toBeLessThan(getIdx)
-  })
-
-  it("[Warning] deferred pull fixture → GET 必须等 pull resolve 才发(await 串行,防旧 GET 后到)", async () => {
-    Object.defineProperty(window, "location", {
+    Object.defineProperty(window, "history", {
       configurable: true,
-      value: {
-        ...originalLocation,
-        search: "",
-        pathname: "/me",
-        origin: "https://x",
-        hash: "",
-        href: "https://x/me",
-      },
+      value: { ...window.history, replaceState: replaceStateSpy },
     })
-    // pull 返一个我们手动 resolve 的 deferred promise,验证 GET 必须等它
-    let resolvePull!: () => void
-    const pullPromise = new Promise<unknown>((resolve) => {
-      resolvePull = () => resolve({})
-    })
-    hoisted.apiClientPost.mockImplementation((path: string) => {
-      if (path === "internal/realname/pull-from-aegis") return pullPromise
-      return Promise.resolve({})
-    })
-    hoisted.apiClientGet.mockResolvedValue({ realname_verified: true, real_name: "张三" })
 
     const vm = new MeInfoVM()
-    const seqPromise = vm.initProfileSequence()
-
-    // pull 还没 resolve,GET 应该还没发出
+    vm.didMount()
     await Promise.resolve()
-    await Promise.resolve()
-    expect(hoisted.apiClientGet).not.toHaveBeenCalledWith("users/uid-1")
 
-    // 放行 pull,GET 现在应被触发
-    resolvePull()
-    await seqPromise
-
-    expect(hoisted.apiClientGet).toHaveBeenCalledWith("users/uid-1")
-    expect(
-      hoisted.apiClientGet.mock.calls.filter((args) => args[0] === "users/uid-1"),
-    ).toHaveLength(1)
-  })
-
-  it("[Warning] pull 失败(Aegis 抖动 reject)→ 仍然发一次 GET,不抛给上层", async () => {
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: {
-        ...originalLocation,
-        search: "",
-        pathname: "/me",
-        origin: "https://x",
-        hash: "",
-        href: "https://x/me",
-      },
-    })
-    hoisted.apiClientPost.mockRejectedValue(new Error("network"))
-    hoisted.apiClientGet.mockResolvedValue({ realname_verified: false, real_name: "" })
-
-    const vm = new MeInfoVM()
-    await expect(vm.initProfileSequence()).resolves.not.toThrow()
-
-    // pull 被调
-    expect(hoisted.apiClientPost).toHaveBeenCalledWith("internal/realname/pull-from-aegis")
-    // GET 仍然发一次(用旧 cache 值渲染,不阻塞 UX)
-    expect(
-      hoisted.apiClientGet.mock.calls.filter((args) => args[0] === "users/uid-1"),
-    ).toHaveLength(1)
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1)
+    const [, , newUrl] = replaceStateSpy.mock.calls[0]
+    expect(newUrl).toContain("sid=abc")
+    expect(newUrl).not.toContain("verified=1")
   })
 })

@@ -29,17 +29,20 @@ import { resolveRealnameVerifyUrl } from "./realnameVerifyUrl";
  *   im-test 会拿到 `accounts-test.imocto.cn`, im-prod 拿到 `accounts.xming.ai`,
  *   和 NavSettingsPanel 「账户中心」入口口径一致。
  *
- * YUJ-398 / GH #1180（Phase 2e 闭环）:im-test 实机发现原方案有 3 个闭环 bug,
+ * YUJ-398 / GH #1180（Phase 2e 闭环）:im-test 实机发现原方案有 2 个闭环 bug,
  *   本 VM 的职责是把前端部分修好:
  *     1. startRealnameVerify 必须传 return_to = `${origin}${pathname}?verified=1`,
  *        否则用户在 Aegis 完成实名没法回跳
  *     2. 删 window.open 失败降级为 `window.location.href=verifyUrl` 的 fallback ——
  *        双跳转是 P1 UX bug,用户点"去认证"会一边开新 tab 一边把当前 tab 替换掉,
  *        导致 ?verified=1 的回跳 handler 永远没有"原页面"可触发
- *     3. didMount 无条件调一次 `POST /v1/internal/realname/pull-from-aegis`
- *        (opportunistic refresh),覆盖"用户直接登 Aegis 实名,没走 OCTO 去认证按钮"
- *        的 dormant 场景 —— 这种情况 ?verified=1 不会出现,徽章若只靠回跳 handler
- *        就永远不亮
+ *
+ * YUJ-406:dmworkim 的 `POST /v1/internal/realname/pull-from-aegis` endpoint 已废弃
+ *   (Aegis 不支持对应的 admin API)。实名同步改走 dmworkim 后端 sync_worker 每 15min
+ *   自动通过 /userinfo 同步, 前端不再主动 pull。本 VM 从 didMount / 回跳 handler 里
+ *   删掉了 pull-from-aegis POST, 仅保留 reloadSelfProfile() 作为刷新实名状态的唯一路径。
+ *   ?verified=1 回跳后徽章可能最多有 15min 感知延迟(下次 sync_worker tick), 对大多数
+ *   用户可接受 —— 实名动作本身人无需秒级反馈。
  *
  *   - 「名字」行右侧展示 ✓ + 「已实名」tag（已认证）
  *   - 新增「账号安全 · 实名认证」section
@@ -48,7 +51,7 @@ import { resolveRealnameVerifyUrl } from "./realnameVerifyUrl";
  *       新窗打开 Aegis 账户页实名锚点。
  *   - Aegis 完成认证后会以 `return_to` 带 `?verified=1` 回跳，由本 VM 的
  *     didMount 兜底 handler + 全局 useRealnameVerifiedLandingHandler 捕获，
- *     重新 `reloadSelfProfile()` 同步新状态。
+ *     重新 `reloadSelfProfile()` 同步新状态(依赖 sync_worker 已写入 user_verification)。
  *   - 老版本后端兜底仍保留：dmworkim /v1/internal/verify-token 现在返回的
  *     也是按环境下发的 Aegis URL，老 App 客户端无需改动即可工作。
  */
@@ -76,19 +79,14 @@ export class MeInfoVM extends ProviderListener {
         }
         WKSDK.shared().channelManager.addListener(this.channelInfoListener)
 
-        // YUJ-398 Round 2 Warning(Jerry-Xin):didMount 三段异步无序会竞态覆盖 ——
-        // 原先顺序是 reloadSelfProfile() → pullRealnameFromAegisAndReload() (内部也
-        // reloadSelfProfile),两次 GET /users/{uid} 并发飞,先发的可能后到,旧 cache
-        // 值覆盖 pull 后的新值,回跳 ?verified=1 后徽章仍不亮。
+        // YUJ-406:pull-from-aegis endpoint 已废弃(dmworkim 侧),本页打开时仅做两件事:
+        //   1. 同步清掉 ?verified=1 query(回跳兜底,避免二次进入重复触发)
+        //   2. reloadSelfProfile 拉一次最新 /users/{uid}
         //
-        // 修法:串行化 ——
-        //   1. 先清 ?verified=1 URL(同步,无 await)
-        //   2. await pull-from-aegis(让 dmworkim 先把 cache upsert 到最新,错误静默)
-        //   3. await reloadSelfProfile() 唯一一次(取 pull 之后的权威 cache)
-        //
-        // didMount 签名保持 void(ProviderListener 基类契约),内部逻辑用 fire-and-forget
-        // 包装 async 子例程。未 await 的 Promise 错误都在子例程内 catch,不会升成
-        // unhandled rejection。
+        // 实名状态由 dmworkim sync_worker 每 15min 自动从 Aegis /userinfo 同步到
+        // user_verification cache。?verified=1 回跳时徽章不保证秒亮,最多 15min 后
+        // 下一轮 sync_worker tick 同步到; 用户已登录过(OIDC callback 即时 upsert)
+        // 且 sync_worker 已跑过一轮的常态下, 通常 reloadSelfProfile 已能读到最新状态。
         try {
             const params = new URLSearchParams(window.location.search)
             if (params.get("verified") === "1") {
@@ -101,34 +99,8 @@ export class MeInfoVM extends ProviderListener {
             // URL API 在非浏览器环境下可能不可用 — 静默降级，不阻塞页面
         }
 
-        // Fire-and-forget 串行启动链。方法声明为 async 便于单测 await。
-        void this.initProfileSequence()
-    }
-
-    /**
-     * YUJ-398 Round 2 · didMount 的串行化子例程,解决 stale GET 覆盖 pull-after-GET 的竞态。
-     *
-     * 顺序:
-     *   1. POST /v1/internal/realname/pull-from-aegis —— 让 dmworkim 主动从 Aegis admin API
-     *      拉 claims 并 upsert user_verification cache。失败静默(Aegis / dmworkim 抖动
-     *      不阻塞后续 load)。
-     *   2. GET /users/{uid} reloadSelfProfile —— 唯一一次 GET,取 step 1 完成后的权威 cache。
-     *
-     * 声明 async + 返回 Promise 便于单测用 await 观察全部副作用;didMount 本身用 `void`
-     * 忽略 Promise(React-style lifecycle 不期望返 Promise)。内部 try/catch 让未处理
-     * 异常不会变成 unhandled rejection。
-     */
-    async initProfileSequence(): Promise<void> {
-        try {
-            await WKApp.apiClient.post("internal/realname/pull-from-aegis")
-        } catch (e) {
-            // Aegis / dmworkim 抖动静默降级,继续走 reloadSelfProfile 用现有 cache 值渲染
-        }
-        try {
-            await this.reloadSelfProfile()
-        } catch (e) {
-            // reloadSelfProfile 内部已经 catch 了 API 错误,这里兜一层防万一
-        }
+        // reloadSelfProfile 内部已 catch 所有 API 错误,不会升成 unhandled rejection。
+        void this.reloadSelfProfile()
     }
 
     didUnMount(): void {
@@ -180,13 +152,14 @@ export class MeInfoVM extends ProviderListener {
      *      否则用户在 Aegis 完成实名后回不到 OCTO,整个链路断在 Aegis
      *   2. 删除 `window.open` 失败降级为 `window.location.href=verifyUrl` 的 fallback——
      *      那是 P1 双跳转 bug:原页面会被替换,等 Aegis 302 回来时没有"原 MeInfo
-     *      页面"可触发 ?verified=1 handler 和 pull-from-aegis;改为 toast 提示用户允许弹窗
+     *      页面"可触发 ?verified=1 handler;改为 toast 提示用户允许弹窗
      *      (禁忌:`window.open fallback 不能改为 tab 跳 + 再 reload,依然会丢状态`)
      *
      * 不再调用 dmworkim `/v1/internal/verify-token` 翻译接口 —— Web 端直接
      * `window.open` 到 Aegis 的实名认证锚点。Aegis 完成后会 redirect 回
      * 本页（带 ?verified=1），由 didMount 的兜底 handler + 全局
-     * useRealnameVerifiedLandingHandler 触发 reloadSelfProfile + pull-from-aegis 同步状态。
+     * useRealnameVerifiedLandingHandler 触发 reloadSelfProfile 同步状态
+     * (YUJ-406: pull-from-aegis 已废弃, 实名同步改走 dmworkim sync_worker 15min 轮询)。
      *
      * URL 解析口径（resolveRealnameVerifyUrl）：
      *   - 按 loginInfo.loginProvider 在 remoteConfig.oidcProviders 里查
@@ -205,7 +178,7 @@ export class MeInfoVM extends ProviderListener {
     startRealnameVerify() {
         // YUJ-398 Round 1 修正(Jerry-Xin Crit):return_to 必须**保留当前 URL 的全部
         // query 参数**(尤其 sid),否则 Aegis 302 回来时 sid 丢失 → App.tsx::getSID 读
-        // 空 sid bucket → loginInfo 读不到 token → pull-from-aegis 请求无鉴权 → P0 闭环仍断。
+        // 空 sid bucket → loginInfo 读不到 token → 后续 /users/{uid} 刷新拿不到鉴权。
         //
         // 登录态按 sid 分桶(App.tsx:275 / 291 / Route.tsx:45 均按 sid 读写 storage key)。
         // 不能用 `${origin}${pathname}?verified=1` 了 —— 必须把现有 ?sid=xxx&... 完整保留,
@@ -263,7 +236,7 @@ export class MeInfoVM extends ProviderListener {
         if (!opened) {
             // 弹窗被浏览器拦截:提示用户允许弹窗后重试,不自动替换当前 tab。
             // 即使用户不允许,当前 tab 的 MeInfo 状态保留,避免 "?verified=1 handler
-            // 无法触发 + pull-from-aegis 链路断" 的二次事故。
+            // 无法触发" 的二次事故。
             Toast.warning("浏览器拦截了新窗口，请允许本站弹窗后重试「去认证」")
             return
         }
