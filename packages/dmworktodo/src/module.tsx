@@ -546,8 +546,13 @@ function GlobalMatterLinkMenu() {
               Toast.success("已同步进展");
               setAnchor(null);
               WKApp.mittBus.emit("wk:exit-multiple-mode");
-            } catch (e) {
-              Toast.error("同步进展失败");
+            } catch (e: any) {
+              const code = e?.response?.data?.error?.code;
+              if (code === "LLM_UPSTREAM_ERROR") {
+                Toast.error("AI 服务暂时不可用，请稍后重试");
+              } else {
+                Toast.error("同步进展失败");
+              }
             } finally {
               setLoading(false);
             }
