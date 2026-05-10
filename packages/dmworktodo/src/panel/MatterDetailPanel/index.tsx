@@ -104,6 +104,14 @@ export default function MatterDetailPanel({
   );
   const [linkModalOpen, setLinkModalOpen] = useState(false);
 
+  // 成功变更 matter 后统一调用: 本地 state 刷新 + 广播事件让左侧列表 reload。
+  // MatterDetailPanel 挂在 routeRight, 左侧 sidebar 列表挂在 routeLeft,
+  // 两个 React 子树不共享 state, 必须靠 mittBus 事件解耦通知。
+  const applyMatterUpdate = useCallback((updated: MatterDetail) => {
+    setMatter(updated);
+    WKApp.mittBus.emit("wk:matter-updated", { matterId: updated.id });
+  }, []);
+
   // Fetch matter
   useEffect(() => {
     if (!matterId) {
@@ -135,7 +143,7 @@ export default function MatterDetailPanel({
       setMatter((prev) => (prev ? { ...prev, status: newStatus } : prev));
       try {
         const updated = await transitionMatter(matter.id, newStatus);
-        setMatter(updated);
+        applyMatterUpdate(updated);
       } catch (err: any) {
         setMatter((prev) => (prev ? { ...prev, status: oldStatus } : prev));
         const msg =
@@ -147,7 +155,7 @@ export default function MatterDetailPanel({
         }
       }
     },
-    [matter],
+    [matter, applyMatterUpdate],
   );
 
   const handleDeleteMatter = useCallback(async () => {
@@ -156,6 +164,7 @@ export default function MatterDetailPanel({
       return;
     try {
       await deleteMatter(matter.id);
+      WKApp.mittBus.emit("wk:matter-deleted", { matterId: matter.id });
       Toast.success("事项已删除");
       onClose();
     } catch {
@@ -170,8 +179,8 @@ export default function MatterDetailPanel({
   const handleLinked = useCallback(async () => {
     if (!matter) return;
     const updated = await getMatter(matter.id);
-    setMatter(updated);
-  }, [matter]);
+    applyMatterUpdate(updated);
+  }, [matter, applyMatterUpdate]);
 
   const handleUnlinkChannel = useCallback(
     async (chId: string) => {
@@ -180,13 +189,13 @@ export default function MatterDetailPanel({
       try {
         await unlinkChannel(matter.id, chId);
         const updated = await getMatter(matter.id);
-        setMatter(updated);
+        applyMatterUpdate(updated);
         Toast.success("已取消关联");
       } catch {
         Toast.error("取消关联失败");
       }
     },
-    [matter],
+    [matter, applyMatterUpdate],
   );
 
   const handleDeleteTimeline = useCallback(
@@ -236,7 +245,7 @@ export default function MatterDetailPanel({
           await addAssignee(matter.id, uid);
         }
         const updated = await getMatter(matter.id);
-        setMatter(updated);
+        applyMatterUpdate(updated);
       } catch (err: any) {
         const msg =
           err?.response?.data?.error?.message ||
@@ -245,7 +254,7 @@ export default function MatterDetailPanel({
         Toast.error(msg);
       }
     },
-    [matter],
+    [matter, applyMatterUpdate],
   );
 
   // ── Hooks: 必须在任何 early return 之前调用, 保证每次渲染 hook 顺序一致 ──
@@ -357,7 +366,7 @@ export default function MatterDetailPanel({
                 const updated = await updateMatter(matter.id, {
                   deadline: newVal || "",
                 });
-                setMatter(updated);
+                applyMatterUpdate(updated);
               }}
             />
             {canForward && (
@@ -401,7 +410,7 @@ export default function MatterDetailPanel({
             value={matter.title}
             onSave={async (newTitle) => {
               const updated = await updateMatter(matter.id, { title: newTitle });
-              setMatter(updated);
+              applyMatterUpdate(updated);
             }}
           />
         </header>
@@ -415,7 +424,7 @@ export default function MatterDetailPanel({
               const updated = await updateMatter(matter.id, {
                 description: newDesc || null,
               });
-              setMatter(updated);
+              applyMatterUpdate(updated);
             }}
           />
           {matter.source_channel_id && (

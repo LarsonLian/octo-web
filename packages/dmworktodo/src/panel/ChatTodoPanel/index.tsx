@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { WKApp } from "@octo/base";
 import { useMatterList } from "../../hooks/useTodoList";
 import MatterDetailPanel from "../MatterDetailPanel";
 import SidebarCard from "../../ui/SidebarCard";
@@ -48,6 +49,20 @@ export default function ChatMatterPanel({
     },
     pageSize: 100,
   });
+
+  // 详情面板编辑 / 删除 matter 后广播 mitt 事件, 这里 reload 保持列表新鲜。
+  // 跟 TodoPage 用同一套事件; 会话右侧面板跟详情面板在同一个 React 子树里
+  // 按理说 setMatter 后可以直接刷新, 但详情面板实际是 key 重建出来的,
+  // 事件驱动更简单, 不用做 props 回传。
+  useEffect(() => {
+    const reloader = () => reload();
+    WKApp.mittBus.on("wk:matter-updated", reloader);
+    WKApp.mittBus.on("wk:matter-deleted", reloader);
+    return () => {
+      WKApp.mittBus.off("wk:matter-updated", reloader);
+      WKApp.mittBus.off("wk:matter-deleted", reloader);
+    };
+  }, [reload]);
 
   const displayMatters = matters;
 

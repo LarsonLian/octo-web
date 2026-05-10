@@ -43,6 +43,15 @@ export type MittEvents = {
    * 不会自动 remount, 接收方需要主动 reload。
    */
   'wk:nav-menu-activated': { menuId: string };
+  /**
+   * Matter 任一字段被编辑后广播 (标题 / 主要目标 / DDL / 状态 / 负责人 /
+   * 关联群聊等)。接收方 (通常是左侧事项列表) 据此 reload, 避免跨 React
+   * 子树数据不同步 — 详情面板和列表分别挂在 routeRight / routeLeft, 不共
+   * 享 state, 列表接口返回的字段也不会被详情页的 setMatter 影响。
+   */
+  'wk:matter-updated': { matterId: string };
+  /** Matter 被删除后广播, 接收方据此从列表移除 */
+  'wk:matter-deleted': { matterId: string };
   "summary-space-changed": undefined;
   /**
    * 频道头像发生变化（上传/更新）时广播。订阅者（例如 WKAvatar）可依据 channelID +

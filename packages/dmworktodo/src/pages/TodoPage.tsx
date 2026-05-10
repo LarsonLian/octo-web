@@ -75,6 +75,19 @@ export default function MatterPage() {
     };
   }, [reload]);
 
+  // 详情面板编辑 matter (标题 / 主要目标 / DDL / 状态 / 负责人 / 关联群聊)
+  // 后会广播 wk:matter-updated, 这里 reload 保证左侧列表拿到最新字段。
+  // 详情面板删除 matter 后广播 wk:matter-deleted, 同样 reload 移除该条。
+  useEffect(() => {
+    const reloader = () => reload();
+    WKApp.mittBus.on("wk:matter-updated", reloader);
+    WKApp.mittBus.on("wk:matter-deleted", reloader);
+    return () => {
+      WKApp.mittBus.off("wk:matter-updated", reloader);
+      WKApp.mittBus.off("wk:matter-deleted", reloader);
+    };
+  }, [reload]);
+
   // 分离活跃 vs 归档
   const activeMatters = useMemo(
     () => matters.filter((m) => m.status !== "archived"),
