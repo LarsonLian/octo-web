@@ -16,6 +16,7 @@
  */
 
 import { WKApp } from '@octo/base';
+import { parseThreadChannelId } from '../utils/channelId';
 
 // ─── Response types (对齐 modules/message/api.go:2468 MsgSyncResp) ──────
 
@@ -126,17 +127,14 @@ export async function getMessageByChannel(args: {
         return getGroupMessage(channelId, messageId);
     }
     if (channelType === 5) {
-        // thread.BuildChannelID 格式: "{groupNo}____{shortId}"
-        // 分隔符是 4 个下划线, 见 dmworkim modules/thread/const.go
-        // ChannelIDSeparator = "____"
-        const SEP = '____';
-        const at = channelId.indexOf(SEP);
-        if (at <= 0 || at + SEP.length >= channelId.length) {
+        // thread.BuildChannelID 格式: "{groupNo}____{shortId}",
+        // 分隔符 4 个下划线见 dmworkim modules/thread/const.go
+        // (ChannelIDSeparator = "____")。复用共享 parser 保证口径一致。
+        const parsed = parseThreadChannelId(channelId);
+        if (!parsed) {
             throw new Error(`invalid thread channel_id: ${channelId}`);
         }
-        const groupNo = channelId.slice(0, at);
-        const shortId = channelId.slice(at + SEP.length);
-        return getThreadMessage(groupNo, shortId, messageId);
+        return getThreadMessage(parsed.groupNo, parsed.shortId, messageId);
     }
     throw new Error(`unsupported channel_type ${channelType} for message lookup`);
 }

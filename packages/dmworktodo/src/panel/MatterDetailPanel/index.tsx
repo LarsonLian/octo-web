@@ -23,6 +23,7 @@ import {
   listActivities,
 } from "../../api/todoApi";
 import { Toast } from "../../utils/toast";
+import { toParentGroupNo } from "../../utils/channelId";
 import UserName from "../../ui/UserName";
 import LinkChannelsModal from "../../ui/LinkChannelsModal";
 import OwnerEditor from "../../ui/OwnerEditor";
@@ -604,8 +605,17 @@ export default function MatterDetailPanel({
               channels.map((ch) => {
                 // 用户是否加入本群: 从 /group/my 拉的 group_no 集合判断。
                 // 拉取失败 (myGroupsFailed) 时保守当成未加入, 宁可多遮。
+                //
+                // 子区 (channel_type=5) 的 channel_id 是 "父群号____short_id"
+                // 拼接而成, /group/my 只返回群 (type=2) 不返回子区, 必须用
+                // 父群号去匹配。toParentGroupNo 已处理: 群类型原样返回,
+                // 子区拆 '____' 取前半段。
+                const parentGroupNo = toParentGroupNo(
+                  ch.channel_id,
+                  ch.channel_type,
+                );
                 const isMember =
-                  !myGroupsFailed && myGroupNos.has(ch.channel_id);
+                  !myGroupsFailed && myGroupNos.has(parentGroupNo);
                 return (
                 <div key={ch.id} className="wk-mp-channels__card">
                   <div className="wk-mp-channels__card-head">
