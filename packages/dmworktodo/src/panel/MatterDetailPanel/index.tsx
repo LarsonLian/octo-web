@@ -138,6 +138,53 @@ export default function MatterDetailPanel({
   );
   const [linkModalOpen, setLinkModalOpen] = useState(false);
 
+  // 每个 channel 的最新一条 timeline 条目 (用于 "最新进展" 展示)。
+  // matter 加载后并发对每个关联 channel 调 listTimeline(limit=1),
+  // 有数据 → 渲染 content; 无数据 → 隐藏 "最新进展" 块。
+  const [latestByChannel, setLatestByChannel] = useState<
+    Map<string, TimelineEntry>
+  >(new Map());
+
+  // matter 加载完成后, 并发拉每个 channel 的最新 1 条 timeline
+  useEffect(() => {
+    if (!matter) {
+      setLatestByChannel(new Map());
+      return;
+    }
+    const chs = matter.channels || [];
+    if (chs.length === 0) {
+      setLatestByChannel(new Map());
+      return;
+    }
+    let aborted = false;
+    Promise.all(
+      chs.map(async (ch) => {
+        try {
+          const res = await listTimeline(matter.id, {
+            source_channel_id: ch.channel_id,
+            limit: 1,
+          });
+          const first = res.data?.[0];
+          return { channelId: ch.channel_id, entry: first || null };
+        } catch {
+          return { channelId: ch.channel_id, entry: null };
+        }
+      }),
+    ).then((results) => {
+      if (aborted) return;
+      const map = new Map<string, TimelineEntry>();
+      for (const r of results) {
+        if (r.entry) map.set(r.channelId, r.entry);
+      }
+      setLatestByChannel(map);
+    });
+    return () => {
+      aborted = true;
+    };
+    // matter.id + channels 变化时重拉
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matter?.id, matter?.channels?.length]);
+
   // 成功变更 matter 后统一调用: 本地 state 刷新 + 广播事件让左侧列表 reload。
   // MatterDetailPanel 挂在 routeRight, 左侧 sidebar 列表挂在 routeLeft,
   // 两个 React 子树不共享 state, 必须靠 mittBus 事件解耦通知。
@@ -585,14 +632,19 @@ export default function MatterDetailPanel({
                       />
                     )}
                   </div>
-                  <div className="wk-mp-channels__card-progress">
-                    <div className="wk-mp-channels__card-progress-label">
-                      最新进展
+                  {/* 最新进展: 有 timeline 条目时显示最新一条 content,
+                      没有时整块隐藏 (不再显示 "暂无进展摘要") */}
+                  {latestByChannel.has(ch.channel_id) && (
+                    <div className="wk-mp-channels__card-progress">
+                      <div className="wk-mp-channels__card-progress-label">
+                        最新进展
+                      </div>
+                      <div className="wk-mp-channels__card-progress-text">
+                        {latestByChannel.get(ch.channel_id)!.content ||
+                          "（无文本内容）"}
+                      </div>
                     </div>
-                    <div className="wk-mp-channels__card-progress-text">
-                      暂无进展摘要（等待一键总结）
-                    </div>
-                  </div>
+                  )}
                   {/* 展开时间线: 按钮常显, 点击时 toggle 并 refetch。
                       不再用 timeline.length > 0 做 gate, 否则空数据时
                       用户连触发刷新的入口都没有 */}
