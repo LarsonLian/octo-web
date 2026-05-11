@@ -3,9 +3,15 @@ import { Modal } from "@douyinfe/semi-ui";
 import type { MatterChannel, LinkChannelReq } from "../../bridge/types";
 import { linkChannel } from "../../api/todoApi";
 import { Toast } from "../../utils/toast";
-import WKSDK, { Channel, ChannelTypeGroup } from "wukongimjssdk";
-import { WKApp } from "@octo/base";
 import "./LinkChannelsModal.css";
+
+export interface ChannelOption {
+  channelId: string;
+  channelType: number;
+  name: string;
+  desc?: string;
+  memberCount?: number;
+}
 
 export interface LinkChannelsModalProps {
   visible: boolean;
@@ -15,14 +21,10 @@ export interface LinkChannelsModalProps {
   linkedChannels: MatterChannel[];
   onClose: () => void;
   onLinked: () => void;
-}
-
-interface ChannelOption {
-  channelId: string;
-  channelType: number;
-  name: string;
-  desc?: string;
-  memberCount?: number;
+  /** 外部注入的群列表加载函数（UI/数据分离）。未传时使用内置 WKApp 加载。 */
+  loadChannels?: () => Promise<ChannelOption[]>;
+  /** 外部注入的关联提交函数。未传时使用内置 linkChannel API。 */
+  onLinkChannel?: (matterId: string, channelId: string, channelType: number, channelName: string) => Promise<void>;
 }
 
 export default function LinkChannelsModal({
@@ -32,6 +34,8 @@ export default function LinkChannelsModal({
   linkedChannels,
   onClose,
   onLinked,
+  loadChannels,
+  onLinkChannel,
 }: LinkChannelsModalProps) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
@@ -47,23 +51,26 @@ export default function LinkChannelsModal({
       return;
     }
     setLoading(true);
-    WKApp.dataSource.channelDataSource
-      .groupSaveList()
-      .then((groups: any[]) => {
-        const opts: ChannelOption[] = groups.map((g: any) => ({
-          channelId: g.channel?.channelID || g.channel_id || "",
-          channelType: g.channel?.channelType || 2,
-          name: g.title || g.name || "",
-          desc: g.remark || g.desc || "",
-          memberCount: g.memberCount || g.member_count || undefined,
-        }));
-        setChannels(opts);
-      })
-      .catch(() => {
-        setChannels([]);
-      })
+    const doLoad = loadChannels
+      ? loadChannels()
+      : import("@octo/base").then(({ WKApp }) =>
+          WKApp.dataSource.channelDataSource
+            .groupSaveList()
+            .then((groups: any[]) =>
+              groups.map((g: any) => ({
+                channelId: g.channel?.channelID || g.channel_id || "",
+                channelType: g.channel?.channelType || 2,
+                name: g.title || g.name || "",
+                desc: g.remark || g.desc || "",
+                memberCount: g.memberCount || g.member_count || undefined,
+              })),
+            ),
+        );
+    doLoad
+      .then((opts) => setChannels(opts))
+      .catch(() => setChannels([]))
       .finally(() => setLoading(false));
-  }, [visible]);
+  }, [visible, loadChannels]);
 
   const linkedIds = new Set(linkedChannels.map((c) => c.channel_id));
 
@@ -92,11 +99,15 @@ export default function LinkChannelsModal({
       for (const chId of selected) {
         const ch = channels.find((c) => c.channelId === chId);
         if (!ch) continue;
-        await linkChannel(matterId, {
-          channel_id: ch.channelId,
-          channel_type: ch.channelType,
-          channel_name: ch.name,
-        });
+        if (onLinkChannel) {
+          await onLinkChannel(matterId, ch.channelId, ch.channelType, ch.name);
+        } else {
+          await linkChannel(matterId, {
+            channel_id: ch.channelId,
+            channel_type: ch.channelType,
+            channel_name: ch.name,
+          });
+        }
       }
       Toast.success(`已关联 ${selected.length} 个群聊`);
       onLinked();

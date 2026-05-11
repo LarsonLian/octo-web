@@ -3,10 +3,8 @@ import { Channel, ChannelTypePerson } from 'wukongimjssdk';
 import WKAvatar from '@octo/base/src/Components/WKAvatar';
 import UserName from '../UserName';
 import { useChannelName } from '../../hooks/useChannelName';
-import {
-    getMessageByChannel,
-    IMMessageResp,
-} from '../../api/imMessageApi';
+import type { IMMessageResp } from '../../api/imMessageApi';
+import { getMessageByChannel as defaultGetMessage } from '../../api/imMessageApi';
 import './index.css';
 
 /**
@@ -46,6 +44,8 @@ export interface AnchorPopoverProps {
     x?: number;
     y?: number;
     onClose: () => void;
+    /** 外部注入的消息获取函数（UI/数据分离）。未传时使用内置 getMessageByChannel。 */
+    fetchMessage?: (params: { channelId: string; channelType: number; messageId: string }) => Promise<IMMessageResp>;
 }
 
 interface LoadedMessage {
@@ -68,6 +68,7 @@ export default function AnchorPopover({
     x,
     y,
     onClose,
+    fetchMessage,
 }: AnchorPopoverProps) {
     const [results, setResults] = useState<FetchResult[]>([]);
     const [loading, setLoading] = useState(true);
@@ -99,11 +100,12 @@ export default function AnchorPopover({
             return;
         }
         setLoading(true);
+        const getMessage = fetchMessage || defaultGetMessage;
         Promise.all(
             messageIds.map(
                 async (mid): Promise<FetchResult> => {
                     try {
-                        const data = await getMessageByChannel({
+                        const data = await getMessage({
                             channelId,
                             channelType,
                             messageId: mid,
