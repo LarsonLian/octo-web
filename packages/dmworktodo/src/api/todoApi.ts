@@ -1,27 +1,30 @@
-import axios from 'axios';
-import { WKApp } from '@octo/base';
+import axios from "axios";
+import { WKApp } from "@octo/base";
 import type {
   Matter,
   MatterDetail,
-  MatterComment,
   MatterChannel,
+  TimelineEntry,
   PaginatedList,
   MatterListParams,
   CreateMatterReq,
   UpdateMatterReq,
   MatterStatus,
   LinkChannelReq,
-  AddCommentReq,
+  ExtractMatterReq,
+  ExtractResult,
+  TimelineReq,
   ListCommentsParams,
-  CommentAttachmentReq,
-} from '../bridge/types';
+  MatterActivity,
+  ListActivitiesParams,
+} from "../bridge/types";
 
 /**
  * Isolated axios instance for matters service API.
  * Must NOT inherit axios.defaults.baseURL (set to '/api/v1/' by WKApp.apiClient)
  * otherwise all paths get double-prefixed.
  */
-const matterAxios = axios.create({ baseURL: '' });
+const matterAxios = axios.create({ baseURL: "" });
 
 // Inject auth headers via interceptor (consistent with base APIClient pattern).
 // Token is read at request time so it stays fresh after refresh.
@@ -29,12 +32,12 @@ matterAxios.interceptors.request.use((config) => {
   const token = WKApp.loginInfo.token;
   if (token) {
     config.headers = config.headers ?? {};
-    config.headers['token'] = token;
+    config.headers["token"] = token;
   }
   const spaceId = WKApp.shared.currentSpaceId;
   if (spaceId) {
     config.headers = config.headers ?? {};
-    config.headers['X-Space-Id'] = spaceId;
+    config.headers["X-Space-Id"] = spaceId;
   }
   return config;
 });
@@ -48,14 +51,35 @@ matterAxios.interceptors.response.use(undefined, (err) => {
 });
 
 /**
- * Extract server error message from axios error response.
+ * Structured API error that preserves server error code and message.
+ * Callers can check `err.code` for specific error handling (e.g. LLM_UPSTREAM_ERROR).
  */
-function extractErrorMessage(err: unknown): string {
-  const axiosErr = err as { response?: { data?: { error?: { message?: string } } } };
-  const msg = axiosErr?.response?.data?.error?.message;
-  const raw = msg || (err instanceof Error ? err.message : 'Request failed');
+export class ApiError extends Error {
+  code?: string;
+  status?: number;
+  constructor(message: string, code?: string, status?: number) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+/**
+ * Extract server error message from axios error response.
+ * Returns an ApiError that preserves the structured error code.
+ */
+function extractApiError(err: unknown): ApiError {
+  const axiosErr = err as {
+    response?: { status?: number; data?: { error?: { message?: string; code?: string } } };
+  };
+  const serverError = axiosErr?.response?.data?.error;
+  const msg = serverError?.message || (err instanceof Error ? err.message : "Request failed");
+  const code = serverError?.code;
+  const status = axiosErr?.response?.status;
   // Cap length to prevent pathologically long server error messages in toasts
-  return raw.length > 200 ? raw.slice(0, 200) + '…' : raw;
+  const capped = msg.length > 200 ? msg.slice(0, 200) + "…" : msg;
+  return new ApiError(capped, code, status);
 }
 
 /**
@@ -63,7 +87,7 @@ function extractErrorMessage(err: unknown): string {
  * Vite dev proxy (apps/web/vite.config.ts) rewrites /matter/* -> /* on the target.
  * Production nginx must have an equivalent rewrite rule.
  */
-const BASE = '/matter/api/v1';
+const BASE = "/matter/api/v1";
 
 /**
  * Build query string params, filtering out undefined values.
@@ -81,15 +105,30 @@ function buildParams(obj?: Record<string, unknown>): Record<string, string> {
 
 /**
  * Unwrap axios response — return response.data directly.
+ * Passes AbortSignal through to axios so callers can cancel in-flight requests.
+ * On cancel, rethrows as { name: 'AbortError' } (not wrapped via extractErrorMessage)
+ * so consumers can distinguish cancellation from real errors.
  */
-async function get<T>(path: string, params?: Record<string, unknown>): Promise<T> {
+async function get<T>(
+  path: string,
+  params?: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<T> {
   try {
-    const resp = await matterAxios.get(`${BASE}${path}`, {
+    const config: { params: Record<string, string>; signal?: AbortSignal } = {
       params: buildParams(params),
-    });
+    };
+    // 只在有 signal 时加到 config, 避免影响既有调用点的参数形状 (测试快照 + 可读性)
+    if (signal) config.signal = signal;
+    const resp = await matterAxios.get(`${BASE}${path}`, config);
     return resp.data;
   } catch (err: unknown) {
-    throw new Error(extractErrorMessage(err));
+    if (axios.isCancel(err)) {
+      const abortErr = new Error("aborted");
+      abortErr.name = "AbortError";
+      throw abortErr;
+    }
+    throw extractApiError(err);
   }
 }
 
@@ -98,7 +137,7 @@ async function post<T>(path: string, data?: unknown): Promise<T> {
     const resp = await matterAxios.post(`${BASE}${path}`, data);
     return resp.data;
   } catch (err: unknown) {
-    throw new Error(extractErrorMessage(err));
+    throw extractApiError(err);
   }
 }
 
@@ -107,7 +146,7 @@ async function put<T>(path: string, data?: unknown): Promise<T> {
     const resp = await matterAxios.put(`${BASE}${path}`, data);
     return resp.data;
   } catch (err: unknown) {
-    throw new Error(extractErrorMessage(err));
+    throw extractApiError(err);
   }
 }
 
@@ -116,29 +155,50 @@ async function del<T>(path: string): Promise<T> {
     const resp = await matterAxios.delete(`${BASE}${path}`);
     return resp.data;
   } catch (err: unknown) {
-    throw new Error(extractErrorMessage(err));
+    throw extractApiError(err);
   }
 }
 
 // ─── Matters ────────────────────────────────────────────
 
-export async function listMatters(params?: MatterListParams): Promise<PaginatedList<Matter>> {
-  return get<PaginatedList<Matter>>('/matters', params as unknown as Record<string, unknown>);
+export async function listMatters(
+  params?: MatterListParams,
+  signal?: AbortSignal,
+): Promise<PaginatedList<Matter>> {
+  return get<PaginatedList<Matter>>(
+    "/matters",
+    params as unknown as Record<string, unknown>,
+    signal,
+  );
 }
 
-export async function getMatter(matterId: string, sourceChannelId?: string): Promise<MatterDetail> {
-  return get<MatterDetail>(`/matters/${matterId}`, sourceChannelId ? { source_channel_id: sourceChannelId } : undefined);
+export async function getMatter(
+  matterId: string,
+  sourceChannelId?: string,
+): Promise<MatterDetail> {
+  return get<MatterDetail>(
+    `/matters/${matterId}`,
+    sourceChannelId ? { source_channel_id: sourceChannelId } : undefined,
+  );
 }
 
-export async function createMatter(req: CreateMatterReq): Promise<MatterDetail> {
-  return post<MatterDetail>('/matters', req);
+export async function createMatter(
+  req: CreateMatterReq,
+): Promise<MatterDetail> {
+  return post<MatterDetail>("/matters", req);
 }
 
-export async function updateMatter(matterId: string, req: UpdateMatterReq): Promise<MatterDetail> {
+export async function updateMatter(
+  matterId: string,
+  req: UpdateMatterReq,
+): Promise<MatterDetail> {
   return put<MatterDetail>(`/matters/${matterId}`, req);
 }
 
-export async function transitionMatter(matterId: string, status: MatterStatus): Promise<MatterDetail> {
+export async function transitionMatter(
+  matterId: string,
+  status: MatterStatus,
+): Promise<MatterDetail> {
   return put<MatterDetail>(`/matters/${matterId}/status`, { status });
 }
 
@@ -148,39 +208,102 @@ export async function deleteMatter(matterId: string): Promise<void> {
 
 // ─── Assignees ──────────────────────────────────────────
 
-export async function addAssignee(matterId: string, userId: string): Promise<void> {
+export async function addAssignee(
+  matterId: string,
+  userId: string,
+): Promise<void> {
   return post<void>(`/matters/${matterId}/assignees`, { user_id: userId });
 }
 
-export async function removeAssignee(matterId: string, userId: string): Promise<void> {
+export async function removeAssignee(
+  matterId: string,
+  userId: string,
+): Promise<void> {
   return del<void>(`/matters/${matterId}/assignees/${userId}`);
 }
 
 // ─── Channels ───────────────────────────────────────────
 
-export async function linkChannel(matterId: string, req: LinkChannelReq): Promise<MatterChannel> {
+export async function linkChannel(
+  matterId: string,
+  req: LinkChannelReq,
+): Promise<MatterChannel> {
   return post<MatterChannel>(`/matters/${matterId}/channels`, req);
 }
 
-export async function unlinkChannel(matterId: string, channelId: string): Promise<void> {
+export async function unlinkChannel(
+  matterId: string,
+  channelId: string,
+): Promise<void> {
   return del<void>(`/matters/${matterId}/channels/${channelId}`);
 }
 
-// ─── Comments ───────────────────────────────────────────
+// ─── Extract (AI 智能创建) ───────────────────────────────
 
-export async function listComments(matterId: string, params?: ListCommentsParams): Promise<PaginatedList<MatterComment>> {
-  return get<PaginatedList<MatterComment>>(`/matters/${matterId}/comments`, params as unknown as Record<string, unknown>);
+export async function extractMatter(
+  req: ExtractMatterReq,
+): Promise<ExtractResult> {
+  return post<ExtractResult>("/matters/extract", req);
 }
 
-export async function addComment(matterId: string, content: string, attachments?: CommentAttachmentReq[]): Promise<MatterComment> {
-  const trimmed = content?.trim() || null;
-  if (!trimmed && (!attachments || attachments.length === 0)) {
-    throw new Error('Comment must have content or attachments');
-  }
-  const body: AddCommentReq = { content: trimmed, attachments };
-  return post<MatterComment>(`/matters/${matterId}/comments`, body);
+// ─── Timeline ───────────────────────────────────────────
+
+export async function listTimeline(
+  matterId: string,
+  params?: ListCommentsParams,
+): Promise<PaginatedList<TimelineEntry>> {
+  return get<PaginatedList<TimelineEntry>>(
+    `/matters/${matterId}/timeline`,
+    params as unknown as Record<string, unknown>,
+  );
 }
 
-export async function deleteComment(matterId: string, commentId: string): Promise<void> {
-  return del<void>(`/matters/${matterId}/comments/${commentId}`);
+export async function addTimelineEntry(
+  matterId: string,
+  req: TimelineReq,
+): Promise<TimelineEntry> {
+  return post<TimelineEntry>(`/matters/${matterId}/timeline`, req);
+}
+
+export async function deleteTimelineEntry(
+  matterId: string,
+  entryId: string,
+): Promise<void> {
+  return del<void>(`/matters/${matterId}/timeline/${entryId}`);
+}
+
+// ─── 兼容旧 API（deprecated） ────────────────────────────
+
+/** @deprecated 使用 listTimeline 替代 */
+export const listComments = listTimeline;
+/** @deprecated 使用 addTimelineEntry 替代 */
+export async function addComment(
+  matterId: string,
+  content: string,
+  attachments?: {
+    file_url: string;
+    file_name?: string;
+    file_size?: number;
+    mime_type?: string;
+  }[],
+): Promise<TimelineEntry> {
+  const body: TimelineReq = {
+    content: content?.trim() || undefined,
+    attachments,
+  };
+  return post<TimelineEntry>(`/matters/${matterId}/timeline`, body);
+}
+/** @deprecated 使用 deleteTimelineEntry 替代 */
+export const deleteComment = deleteTimelineEntry;
+
+// ─── Activities (变更记录) ───────────────────────────────
+
+export async function listActivities(
+  matterId: string,
+  params?: ListActivitiesParams,
+): Promise<PaginatedList<MatterActivity>> {
+  return get<PaginatedList<MatterActivity>>(
+    `/matters/${matterId}/activities`,
+    params as unknown as Record<string, unknown>,
+  );
 }

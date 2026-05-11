@@ -11,6 +11,10 @@ export type MittEvents = {
   };
   "wk:close-thread-panel": undefined;
   "wk:toggle-matter-panel": { channelId: string; channelType: number };
+  /** v0.7 Matter 详情面板切换（跟子区/文件预览/任务列表可并存） */
+  "wk:toggle-matter-detail-panel": { channelId: string; channelType: number };
+  /** 打开多选→添加到事项的弹出菜单（由 dmworktodo 模块接管渲染） */
+  "wk:open-matter-link-menu": { anchor: HTMLElement; channelId: string; channelType: number; messages?: Array<{ messageSeq?: number; messageID?: string; fromUID?: string; fromUName?: string; content?: string; timestamp?: number; attachments?: any[] }> };
   "wk:switch-sidebar-tab": string;
   "wk:file-preview": {
     url: string;
@@ -33,6 +37,21 @@ export type MittEvents = {
   'wk:open-create-matter-modal': { channelId: string; channelType: number; channelName?: string; prefillTitle?: string; prefillAssigneeUids?: string[]; clearOnConfirm?: boolean };
   /** After matter created from toolbar/Alt+Enter, send editor content then clear */
   'wk:matter-created-from-input': { channelId: string; channelType: number };
+  /**
+   * NavRail 菜单按钮被点击 (不论是切换到该菜单还是重复点击当前菜单)。
+   * 接收方可以据此刷新数据 — 同一路由长期挂载时用户重进菜单的场景下, 组件
+   * 不会自动 remount, 接收方需要主动 reload。
+   */
+  'wk:nav-menu-activated': { menuId: string };
+  /**
+   * Matter 任一字段被编辑后广播 (标题 / 主要目标 / DDL / 状态 / 负责人 /
+   * 关联群聊等)。接收方 (通常是左侧事项列表) 据此 reload, 避免跨 React
+   * 子树数据不同步 — 详情面板和列表分别挂在 routeRight / routeLeft, 不共
+   * 享 state, 列表接口返回的字段也不会被详情页的 setMatter 影响。
+   */
+  'wk:matter-updated': { matterId: string };
+  /** Matter 被删除后广播, 接收方据此从列表移除 */
+  'wk:matter-deleted': { matterId: string };
   "summary-space-changed": undefined;
   /**
    * 频道头像发生变化（上传/更新）时广播。订阅者（例如 WKAvatar）可依据 channelID +

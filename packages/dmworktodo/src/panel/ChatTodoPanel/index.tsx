@@ -1,10 +1,18 @@
-import React, { useState, useCallback } from 'react';
-import type { Matter } from '../../bridge/types';
-import { useMatterList } from '../../hooks/useTodoList';
-import MatterCard from '../../ui/TodoCard';
-import DetailPanel from '../../ui/DetailPanel';
-import QuickAddBar from '../../ui/QuickAddBar';
-import './index.css';
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
+import { WKApp } from "@octo/base";
+import WKAvatar from "@octo/base/src/Components/WKAvatar";
+import { Channel, ChannelTypePerson } from "wukongimjssdk";
+import { useMatterList } from "../../hooks/useTodoList";
+import MatterDetailPanel from "../MatterDetailPanel";
+import SidebarCard from "../../ui/SidebarCard";
+import UserName from "../../ui/UserName";
+import {
+  THREAD_DEFAULT_WIDTH,
+  clampThreadWidth,
+  restoreThreadWidth,
+  persistThreadWidth,
+} from "@octo/base/src/Components/WKLayout/layoutWidth";
+import "../../pages/MatterPage.css";
 
 export interface ChatMatterPanelProps {
   channelId: string;
@@ -13,121 +21,245 @@ export interface ChatMatterPanelProps {
   onClose: () => void;
 }
 
-type Tab = 'open' | 'done';
+type Tab = "mine" | "created" | "all";
 
-/**
- * ChatMatterPanel — 频道侧边任务面板（M4 重构）
- * - 两个 Tab：待处理 / 已完成
- * - 点击卡片展开 DetailPanel（原地替换列表）
- * - 底部 QuickAddBar：Enter 乐观创建，⊕ 展开完整 Modal
- */
 export default function ChatMatterPanel({
   channelId,
   channelType,
   channelName,
   onClose,
 }: ChatMatterPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('open');
+  const [activeTab, setActiveTab] = useState<Tab>("all");
   const [selectedMatterId, setSelectedMatterId] = useState<string | null>(null);
 
-  const { matters, loading, reload, toggleStatus, addOptimistic, removeOptimistic } = useMatterList({
+  // ── UI/数据分离: 为 ui/ 组件提供 renderAvatar / renderUserName ──
+  const renderAvatar = useCallback(
+    (uid: string, size: number) => (
+      <WKAvatar
+        channel={new Channel(uid, ChannelTypePerson)}
+        style={{ width: size, height: size }}
+      />
+    ),
+    [],
+  );
+  const renderUserName = useCallback(
+    (uid: string) => <UserName uid={uid} />,
+    [],
+  );
+
+  const [isDragging, setIsDragging] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragStartX = useRef(0);
+  const dragStartWidth = useRef(0);
+  const lastPanelWidth = useRef(
+    clampThreadWidth(restoreThreadWidth(), window.innerWidth, 300),
+  );
+
+  const { matters, loading, reload } = useMatterList({
     initialFilters: {
-      source_channel_id: channelId,
-      source_channel_type: channelType,
+      // 用 channel_id (todos PR #38) 严格按 channel 过滤:
+      //   - 只返回 matter_channels 关联了本 channel 的 Matter
+      //   - 跟 source_channel_id 的区别是 AND 而非 OR, 不会混入
+      //     "我相关但跟本群无关" 的 Matter
+      //   - 后端不需要 channel_type 配对参数 (matter_channels 唯一键是
+      //     (matter_id, channel_id), channel_type 冗余)
+      channel_id: channelId,
     },
     pageSize: 100,
   });
 
-  const openMatters = matters.filter((t) => t.status === 'open');
-  const closedMatters = matters.filter((t) => t.status === 'done' || t.status === 'archived');
-  const displayMatters = activeTab === 'open' ? openMatters : closedMatters;
-
-  const handleQuickCreated = useCallback((matter: Matter) => {
-    if (matter.id.startsWith('__rollback__')) {
-      // 回滚：移除乐观条目，reload 拿真实数据
-      removeOptimistic(matter.id.replace('__rollback__', '__optimistic__'));
+  // 详情面板编辑 / 删除 matter 后广播 mitt 事件, 这里 reload 保持列表新鲜。
+  // 跟 TodoPage 用同一套事件; 会话右侧面板跟详情面板在同一个 React 子树里
+  // 按理说 setMatter 后可以直接刷新, 但详情面板实际是 key 重建出来的,
+  // 事件驱动更简单, 不用做 props 回传。
+  //
+  // 滚动位置锁定: reload 整替 matters → 列表 DOM 重建 → scrollTop 归 0,
+  // 用户看到的卡片跳走。reload 前存一下 scrollTop, 新数据渲染完用
+  // useLayoutEffect 在 paint 前写回, 无闪烁。
+  const listRef = useRef<HTMLDivElement>(null);
+  const pendingScrollRestoreRef = useRef<number | null>(null);
+  useEffect(() => {
+    const reloader = () => {
+      if (listRef.current) {
+        pendingScrollRestoreRef.current = listRef.current.scrollTop;
+      }
       reload();
-      return;
+    };
+    WKApp.mittBus.on("wk:matter-updated", reloader);
+    WKApp.mittBus.on("wk:matter-deleted", reloader);
+    return () => {
+      WKApp.mittBus.off("wk:matter-updated", reloader);
+      WKApp.mittBus.off("wk:matter-deleted", reloader);
+    };
+  }, [reload]);
+  useLayoutEffect(() => {
+    const saved = pendingScrollRestoreRef.current;
+    if (saved !== null && listRef.current) {
+      listRef.current.scrollTop = saved;
+      pendingScrollRestoreRef.current = null;
     }
-    if (matter.id.startsWith('__optimistic__')) {
-      // 乐观插入：立即显示在列表顶部
-      addOptimistic(matter);
-      return;
-    }
-    // 真实数据回来：移除所有乐观条目（每次只有一个），reload 拿真实列表
-    removeOptimistic('__optimistic__');
-    reload();
-  }, [reload, addOptimistic, removeOptimistic]);
+  }, [matters]);
 
-  const channel = { channelId, channelType, name: channelName };
+  const currentUid = WKApp.loginInfo.uid;
+  const displayMatters = (() => {
+    switch (activeTab) {
+      case "mine":
+        return matters.filter(
+          (m) => m.assignees?.some((a) => a.user_id === currentUid),
+        );
+      case "created":
+        return matters.filter((m) => m.creator_id === currentUid);
+      case "all":
+      default:
+        return matters;
+    }
+  })();
+
+  const TABS: Array<{ id: Tab; label: string }> = [
+    { id: "mine", label: "我负责的" },
+    { id: "created", label: "我创建的" },
+    { id: "all", label: "全部" },
+  ];
+
+  // ── Splitter drag ──
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = lastPanelWidth.current;
+    setIsDragging(true);
+    document.addEventListener("mousemove", onDragMove);
+    document.addEventListener("mouseup", onDragEnd);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  const onDragMove = useCallback((e: MouseEvent) => {
+    const delta = dragStartX.current - e.clientX;
+    const newWidth = clampThreadWidth(
+      dragStartWidth.current + delta,
+      window.innerWidth,
+      300,
+    );
+    lastPanelWidth.current = newWidth;
+    const panel = panelRef.current;
+    if (panel) {
+      panel.style.width = newWidth + "px";
+      panel.parentElement?.style.setProperty(
+        "--wk-width-thread-panel",
+        newWidth + "px",
+      );
+    }
+  }, []);
+
+  const onDragEnd = useCallback(() => {
+    document.removeEventListener("mousemove", onDragMove);
+    document.removeEventListener("mouseup", onDragEnd);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    setIsDragging(false);
+    persistThreadWidth(lastPanelWidth.current);
+  }, []);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (panel) {
+      panel.style.width = lastPanelWidth.current + "px";
+      panel.parentElement?.style.setProperty(
+        "--wk-width-thread-panel",
+        lastPanelWidth.current + "px",
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener("mousemove", onDragMove);
+      document.removeEventListener("mouseup", onDragEnd);
+    };
+  }, [onDragMove, onDragEnd]);
+
+  if (selectedMatterId) {
+    return (
+      <div ref={panelRef}>
+        <div
+          className={`wk-thread-panel-splitter${isDragging ? " wk-thread-panel-splitter-active" : ""}`}
+          onMouseDown={onDragStart}
+        >
+          <div className="wk-thread-panel-splitter-line" />
+        </div>
+        <MatterDetailPanel
+          key={selectedMatterId}
+          matterId={selectedMatterId}
+          channelId={channelId}
+          channelType={channelType}
+          onClose={() => setSelectedMatterId(null)}
+        />
+        {isDragging && <div className="wk-thread-panel-drag-overlay" />}
+      </div>
+    );
+  }
 
   return (
-    <div className="wk-matter-chat-panel">
-      {/* Header — 详情页时隐藏，由 DetailPanel 自己的 header 接管 */}
-      {!selectedMatterId && (
-        <div className="wk-matter-chat-panel__header">
-          <span className="wk-matter-chat-panel__title">事项</span>
-          <button type="button" className="wk-matter-chat-panel__close" onClick={onClose}>✕</button>
-        </div>
-      )}
+    <div className="wk-mp-page-sidebar" ref={panelRef}>
+      {/* Splitter */}
+      <div
+        className={`wk-thread-panel-splitter${isDragging ? " wk-thread-panel-splitter-active" : ""}`}
+        onMouseDown={onDragStart}
+      >
+        <div className="wk-thread-panel-splitter-line" />
+      </div>
 
-      {/* Tabs — 详情页时隐藏 */}
-      <div className="wk-matter-chat-panel__tabs" style={selectedMatterId ? { display: 'none' } : undefined}>
+      <div className="wk-mp-page-sidebar__header">
+        <h2 className="wk-mp-page-sidebar__title">事项</h2>
         <button
           type="button"
-          className={`wk-matter-chat-panel__tab${activeTab === 'open' ? ' wk-matter-chat-panel__tab--active' : ''}`}
-          onClick={() => { setActiveTab('open'); setSelectedMatterId(null); }}
+          className="wk-mp-page-sidebar__close"
+          onClick={onClose}
+          aria-label="关闭"
         >
-          待处理 <span className="wk-matter-chat-panel__tab-count">{openMatters.length}</span>
-        </button>
-        <button
-          type="button"
-          className={`wk-matter-chat-panel__tab${activeTab === 'done' ? ' wk-matter-chat-panel__tab--active' : ''}`}
-          onClick={() => { setActiveTab('done'); setSelectedMatterId(null); }}
-        >
-          已完成 <span className="wk-matter-chat-panel__tab-count">{closedMatters.length}</span>
+          ✕
         </button>
       </div>
 
-      {/* Body: list or detail */}
-      <div className="wk-matter-chat-panel__body">
-        {selectedMatterId ? (
-          <DetailPanel
-            matterId={selectedMatterId}
-            channel={channel}
-            onClose={() => setSelectedMatterId(null)}
-            onStatusChanged={reload}
-            showBack
-          />
-        ) : (
-          <>
-            {loading && <div className="wk-matter-chat-panel__empty">加载中...</div>}
-            {!loading && displayMatters.length === 0 && (
-              <div className="wk-matter-chat-panel__empty">
-                {activeTab === 'open' ? '暂无待处理事项' : '暂无已完成事项'}
-              </div>
-            )}
-            {!loading && displayMatters.map((matter) => (
-              <div key={matter.id} style={{ marginBottom: 4 }}>
-                <MatterCard
-                  matter={matter}
-                  assigneeUids={[]}
-                  onClick={(id) => setSelectedMatterId(id)}
-                  onStatusChange={(id) => toggleStatus(id,matter.status)}
-                />
-              </div>
-            ))}
-          </>
+      <div className="wk-mp-page-sidebar__tabs">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`wk-mp-page-sidebar__tab${activeTab === t.id ? " is-active" : ""}`}
+            onClick={() => setActiveTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="wk-mp-page-sidebar__list" ref={listRef}>
+        {loading && <div className="wk-mp-page-sidebar__empty">加载中...</div>}
+        {!loading && displayMatters.length === 0 && (
+          <div className="wk-mp-page-sidebar__empty">暂无事项</div>
+        )}
+        {!loading &&
+          displayMatters.map((matter) => (
+            <SidebarCard
+              key={matter.id}
+              matter={matter}
+              selected={false}
+              onClick={() => setSelectedMatterId(matter.id)}
+              renderAvatar={renderAvatar}
+              renderUserName={renderUserName}
+              sourceChannelName={matter.source_name}
+            />
+          ))}
+        {!loading && displayMatters.length > 0 && (
+          <button type="button" className="wk-mp-page-sidebar__archived-toggle">
+            <span className="wk-mp-page-sidebar__archived-chev">▸</span>
+            已归档 (0)
+          </button>
         )}
       </div>
 
-      {/* Quick add footer */}
-      <QuickAddBar
-        channelId={channelId}
-        channelType={channelType}
-        channelName={channelName}
-        onCreated={handleQuickCreated}
-      />
+      {isDragging && <div className="wk-thread-panel-drag-overlay" />}
     </div>
   );
 }

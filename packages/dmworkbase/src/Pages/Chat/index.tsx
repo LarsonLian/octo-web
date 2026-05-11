@@ -67,6 +67,8 @@ export interface ChatContentPageState {
   activePreviewMessageId: string | null;
   /** 任务列表面板是否显示 */
   showMatterPanel: boolean;
+  /** v0.7 Matter 详情面板是否显示（跟子区/文件预览/任务列表可并存） */
+  showMatterDetailPanel: boolean;
 }
 export class ChatContentPage extends Component<
   ChatContentPageProps,
@@ -87,6 +89,7 @@ export class ChatContentPage extends Component<
       previewFile: null,
       activePreviewMessageId: null,
       showMatterPanel: false,
+      showMatterDetailPanel: false,
     };
   }
 
@@ -133,11 +136,16 @@ export class ChatContentPage extends Component<
       return;
     }
 
-    // 正常处理：打开文件预览，确保侧边面板打开（子区和文件预览共用一个壳子）
+    // 正常处理：打开文件预览，确保侧边面板打开（子区和文件预览共用一个壳子）。
+    // 互斥：事项列表 / 事项详情跟文件预览都在同一个侧边容器区域，同时显示会
+    // 相互遮盖。打开文件预览时强制关掉两个事项面板，避免 "看不到预览" 的
+    // 死锁 (跟 _onToggleMatterPanel 打开事项时关文件预览的处理对称)。
     this.setState({
       previewFile: file,
       showThreadPanel: true, // 确保面板打开
       showChannelSetting: false, // 关闭设置面板，避免布局冲突
+      showMatterPanel: false, // 关闭事项列表面板, 避免遮盖文件预览
+      showMatterDetailPanel: false, // 关闭事项详情面板, 避免遮盖文件预览
       activePreviewMessageId: file.messageId || null, // 保存激活的消息 ID
     });
   };
@@ -160,7 +168,8 @@ export class ChatContentPage extends Component<
     };
     WKSDK.shared().channelManager.addListener(this.channelInfoListener);
 
-    // 注册 pending-thread 事件监听（当前频道已打开时直接导航到子区）
+    // 注册 pending-thread 事件监听（当前频道已打开时直接导航到子区）。
+    // 跟文件预览 / 事项列表 / 事项详情互斥 (同一侧边容器)。
     this._onPendingThread = (detail: {
       groupNo: string;
       thread: Thread | null;
@@ -171,6 +180,8 @@ export class ChatContentPage extends Component<
           activeThread: detail.thread || null,
           previewFile: null, // 关闭文件预览
           activePreviewMessageId: null,
+          showMatterPanel: false, // 关闭事项列表面板
+          showMatterDetailPanel: false, // 关闭事项详情面板
         });
       }
     };
@@ -184,7 +195,9 @@ export class ChatContentPage extends Component<
     };
     WKApp.mittBus.on("wk:close-thread-panel", this._onCloseThreadPanel);
 
-    // 注册任务列表面板切换事件监听
+    // 注册任务列表面板切换事件监听。
+    // 互斥关系: 打开事项列表时关掉其它同容器的侧边面板 (事项详情 / 子区 /
+    // 文件预览), 关闭时不影响其它。
     this._onToggleMatterPanel = (data) => {
       if (
         data.channelId !== channel.channelID ||
@@ -195,6 +208,7 @@ export class ChatContentPage extends Component<
         const opening = !prevState.showMatterPanel;
         return {
           showMatterPanel: opening,
+          showMatterDetailPanel: opening ? false : prevState.showMatterDetailPanel,
           showThreadPanel: opening ? false : prevState.showThreadPanel,
           activeThread: opening ? null : prevState.activeThread,
           previewFile: opening ? null : prevState.previewFile,
@@ -206,6 +220,35 @@ export class ChatContentPage extends Component<
     };
     WKApp.mittBus.on("wk:toggle-matter-panel", this._onToggleMatterPanel);
 
+    // 注册 v0.7 事项详情面板切换。
+    // 跟文件预览 / 子区 / 任务列表互斥: 跟 _onToggleMatterPanel (事项列表)
+    // 一样, 打开时关掉其它侧边面板, 关闭时不影响其它。
+    this._onToggleMatterDetailPanel = (data) => {
+      if (
+        data.channelId !== channel.channelID ||
+        data.channelType !== channel.channelType
+      )
+        return;
+      this.setState((prevState) => {
+        const opening = !prevState.showMatterDetailPanel;
+        if (!opening) {
+          return { showMatterDetailPanel: false };
+        }
+        return {
+          showMatterDetailPanel: true,
+          showMatterPanel: false,
+          showThreadPanel: false,
+          activeThread: null,
+          previewFile: null,
+          activePreviewMessageId: null,
+        };
+      });
+    };
+    WKApp.mittBus.on(
+      "wk:toggle-matter-detail-panel",
+      this._onToggleMatterDetailPanel
+    );
+
     // 检查是否需要自动打开子区面板（查看全部子区）
     if (WKApp.shared.pendingThreadPanel === channel.channelID) {
       this.setState({
@@ -213,6 +256,8 @@ export class ChatContentPage extends Component<
         activeThread: null,
         previewFile: null,
         activePreviewMessageId: null,
+        showMatterPanel: false, // 互斥
+        showMatterDetailPanel: false, // 互斥
       });
       WKApp.shared.pendingThreadPanel = undefined;
     }
@@ -235,6 +280,8 @@ export class ChatContentPage extends Component<
           conversationDigest: pending.conversationDigest,
         },
         activePreviewMessageId: pending.messageId || null,
+        showMatterPanel: false, // 互斥
+        showMatterDetailPanel: false, // 互斥
       });
     }
 
@@ -258,7 +305,8 @@ export class ChatContentPage extends Component<
   componentDidUpdate(prevProps: ChatContentPageProps) {
     const { channel } = this.props;
 
-    // 切换频道时消费 pendingThreadPanel 和 pendingFilePreview
+    // 切换频道时消费 pendingThreadPanel 和 pendingFilePreview。
+    // 两个场景都要跟事项列表 / 事项详情互斥 (同一侧边容器)。
     if (channel.channelID !== prevProps.channel.channelID) {
       // 打开全部子区列表
       if (WKApp.shared.pendingThreadPanel === channel.channelID) {
@@ -268,6 +316,8 @@ export class ChatContentPage extends Component<
           activeThread: null,
           previewFile: null, // 关闭文件预览（互斥）
           activePreviewMessageId: null,
+          showMatterPanel: false, // 互斥
+          showMatterDetailPanel: false, // 互斥
         });
         return;
       }
@@ -290,6 +340,8 @@ export class ChatContentPage extends Component<
             conversationDigest: pending.conversationDigest,
           },
           activePreviewMessageId: pending.messageId || null,
+          showMatterPanel: false, // 互斥
+          showMatterDetailPanel: false, // 互斥
         });
         return;
       }
@@ -324,6 +376,10 @@ export class ChatContentPage extends Component<
     channelId: string;
     channelType: number;
   }) => void;
+  private _onToggleMatterDetailPanel?: (data: {
+    channelId: string;
+    channelType: number;
+  }) => void;
 
   componentWillUnmount() {
     WKApp.mittBus.off("wk:file-preview", this._onFilePreview);
@@ -335,6 +391,12 @@ export class ChatContentPage extends Component<
     }
     if (this._onToggleMatterPanel) {
       WKApp.mittBus.off("wk:toggle-matter-panel", this._onToggleMatterPanel);
+    }
+    if (this._onToggleMatterDetailPanel) {
+      WKApp.mittBus.off(
+        "wk:toggle-matter-detail-panel",
+        this._onToggleMatterDetailPanel
+      );
     }
     WKSDK.shared().channelManager.removeListener(this.channelInfoListener);
   }
@@ -349,6 +411,7 @@ export class ChatContentPage extends Component<
       activeThread,
       previewFile,
       showMatterPanel,
+      showMatterDetailPanel,
     } = this.state;
     // 子区页面不显示讨论串按钮
     const isThreadChannel = channel.channelType === ChannelTypeCommunityTopic;
@@ -363,7 +426,8 @@ export class ChatContentPage extends Component<
           showChannelSetting ? "wk-chat-channelsetting-open" : "",
           showThreadPanel || previewFile || showMatterPanel
             ? "wk-chat-threadpanel-open"
-            : ""
+            : "",
+          showMatterDetailPanel ? "wk-chat-matter-detail-panel-open" : ""
         )}
       >
         <div
@@ -394,6 +458,8 @@ export class ChatContentPage extends Component<
                   activeThread: null,
                   previewFile: null, // 关闭文件预览
                   activePreviewMessageId: null,
+                  showMatterPanel: false, // 与事项列表面板互斥
+                  showMatterDetailPanel: false, // 与事项详情面板互斥
                 });
                 return;
               }
@@ -538,7 +604,8 @@ export class ChatContentPage extends Component<
                             e.stopPropagation();
                             this.setState({
                               showThreadPanel: true,
-                              showMatterPanel: false, // 与事项面板互斥
+                              showMatterPanel: false, // 与事项列表面板互斥
+                              showMatterDetailPanel: false, // 与事项详情面板互斥
                               activeThread: null,
                               previewFile: null, // 关闭文件预览（互斥）
                               activePreviewMessageId: null,
@@ -601,7 +668,8 @@ export class ChatContentPage extends Component<
                   if (threadInfo) {
                     this.setState({
                       showThreadPanel: true,
-                      showMatterPanel: false, // 与事项面板互斥
+                      showMatterPanel: false, // 与事项列表面板互斥
+                      showMatterDetailPanel: false, // 与事项详情面板互斥
                       previewFile: null, // 关闭文件预览（互斥）
                       activePreviewMessageId: null,
                       activeThread: buildThreadStub(
@@ -719,6 +787,15 @@ export class ChatContentPage extends Component<
           <div className="wk-thread-panel">
             {WKApp.endpoints.chatMatterPanel(channel, () =>
               this.setState({ showMatterPanel: false })
+            )}
+          </div>
+        )}
+
+        {/* v0.7 Matter 详情面板（跟子区/文件预览/任务列表可并存，不互斥） */}
+        {showMatterDetailPanel && (
+          <div className="wk-matter-detail-panel">
+            {WKApp.endpoints.chatMatterDetailPanel(channel, () =>
+              this.setState({ showMatterDetailPanel: false })
             )}
           </div>
         )}
