@@ -52,7 +52,7 @@ export default function MatterDetailPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "channels" | "outputs" | "changelog"
+    "channels" | "changelog"
   >("channels");
 
   // Timeline
@@ -461,12 +461,11 @@ export default function MatterDetailPanel({
     liveSourceName || matter.source_name || "未知群聊";
 
   const tabs: {
-    id: "channels" | "outputs" | "changelog";
+    id: "channels" | "changelog";
     label: string;
     count: number;
   }[] = [
     { id: "channels", label: "关联群聊", count: channels.length },
-    { id: "outputs", label: "产出文件", count: 0 },
     { id: "changelog", label: "变更记录", count: activities.length },
   ];
 
@@ -615,6 +614,8 @@ export default function MatterDetailPanel({
               <OwnerEditor
                 assignees={assignees}
                 canEdit={canEditOwner}
+                currentUid={currentUid || ""}
+                isCreator={matter.creator_id === currentUid}
                 candidateChannels={ownerCandidateChannels}
                 onToggle={handleToggleAssignee}
               />
@@ -812,11 +813,6 @@ export default function MatterDetailPanel({
               })
             )}
           </div>
-        )}
-
-        {/* ── Tab: 产出文件 ── */}
-        {activeTab === "outputs" && (
-          <div className="wk-mp-empty-tab">产出文件功能即将上线</div>
         )}
 
         {/* ── Tab: 变更记录 (activities) ── */}

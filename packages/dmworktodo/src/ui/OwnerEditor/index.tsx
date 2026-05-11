@@ -28,8 +28,12 @@ import './index.css';
 
 export interface OwnerEditorProps {
     assignees: MatterAssignee[];
-    /** 当前用户是否有编辑权限 */
+    /** 当前用户是否有编辑权限 (打开下拉框) */
     canEdit: boolean;
+    /** 当前用户 UID (用于细粒度移除权限判断) */
+    currentUid: string;
+    /** 当前用户是否是 Matter 发起人 (creator 能移除任何人, 非 creator 只能移除自己) */
+    isCreator: boolean;
     /**
      * 候选成员来源 channel 列表。一般传 Matter 关联的所有 channel
      * (matter.channels + source_channel, 去重后)。
@@ -98,6 +102,8 @@ function OwnerOptionConnected({
 export default function OwnerEditor({
     assignees,
     canEdit,
+    currentUid,
+    isCreator,
     candidateChannels,
     onToggle,
 }: OwnerEditorProps) {
@@ -222,13 +228,22 @@ export default function OwnerEditor({
                         const picked = assignedUids.has(c.uid);
                         const isLast = picked && assignees.length <= 1;
                         const isPending = pending.has(c.uid);
+                        // 移除权限 (对齐后端 RemoveAssignee):
+                        //   - creator 能移除任何人
+                        //   - 非 creator 只能移除自己 (self-unassign)
+                        //   - 添加不受此限制 (AddAssignee: creator OR assignee)
+                        const canRemoveThis = picked
+                          ? isCreator || c.uid === currentUid
+                          : true; // 不是移除操作, 不限制
+                        const disabled =
+                          isLast || isPending || (picked && !canRemoveThis);
                         return (
                             <OwnerOptionConnected
                                 key={c.uid}
                                 uid={c.uid}
                                 picked={picked}
                                 onClick={() => handleToggle(c.uid)}
-                                disabled={isLast || isPending}
+                                disabled={disabled}
                                 fallbackName={c.name}
                             />
                         );
