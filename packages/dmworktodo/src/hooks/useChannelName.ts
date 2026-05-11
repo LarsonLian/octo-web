@@ -36,9 +36,9 @@ export function useChannelName(
         const cached = WKSDK.shared().channelManager.getChannelInfo(channel);
         if (cached?.title) {
             setName(cached.title);
-            return;
         }
 
+        // 无论缓存是否命中都注册 listener, 确保群改名后 UI 能实时更新
         const listener = (channelInfo: ChannelInfo) => {
             if (
                 !aborted &&
@@ -50,10 +50,14 @@ export function useChannelName(
         };
 
         WKSDK.shared().channelManager.addListener(listener);
-        WKSDK.shared().channelManager.fetchChannelInfo(channel).catch(() => {
-            // fetch 失败不 fallback 到 channelId; 调用方视觉上 "#{xxx...}" 不友好,
-            // 保持空串让上层决定显示 "未知群聊" 或隐藏整块
-        });
+
+        // 缓存未命中时触发异步 fetch
+        if (!cached?.title) {
+            WKSDK.shared().channelManager.fetchChannelInfo(channel).catch(() => {
+                // fetch 失败不 fallback 到 channelId; 调用方视觉上 "#{xxx...}" 不友好,
+                // 保持空串让上层决定显示 "未知群聊" 或隐藏整块
+            });
+        }
 
         return () => {
             aborted = true;

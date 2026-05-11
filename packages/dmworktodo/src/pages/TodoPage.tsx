@@ -20,8 +20,6 @@ import "./MatterPage.css";
  *   - 不放"新建"按钮（PRD §3 创建从 IM 多选触发）
  *   - 卡片：M-ID + 状态 + DDL + 标题 + creator + channel
  *   - 底部：已归档折叠区
- *
- * TODO(backend): 详情暂用 mock，后续接真实 API
  */
 
 type NavTab = "mine" | "created" | "all";

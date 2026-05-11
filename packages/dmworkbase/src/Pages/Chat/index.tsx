@@ -458,6 +458,8 @@ export class ChatContentPage extends Component<
                   activeThread: null,
                   previewFile: null, // 关闭文件预览
                   activePreviewMessageId: null,
+                  showMatterPanel: false, // 与事项列表面板互斥
+                  showMatterDetailPanel: false, // 与事项详情面板互斥
                 });
                 return;
               }

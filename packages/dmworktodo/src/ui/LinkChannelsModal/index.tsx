@@ -117,7 +117,7 @@ export default function LinkChannelsModal({
     } finally {
       setSubmitting(false);
     }
-  }, [selected, submitting, channels, matterId, onLinked, onClose]);
+  }, [selected, submitting, channels, matterId, onLinked, onClose, onLinkChannel]);
 
   return (
     <Modal
