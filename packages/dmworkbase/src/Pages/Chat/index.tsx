@@ -130,7 +130,7 @@ export class ChatContentPage extends Component<
       // 切换到子区完整视图
       const threadChannel = new Channel(
         activeThread.channel_id,
-        ChannelTypeCommunityTopic
+        ChannelTypeCommunityTopic,
       );
       WKApp.endpoints.showConversation(threadChannel);
       return;
@@ -208,7 +208,9 @@ export class ChatContentPage extends Component<
         const opening = !prevState.showMatterPanel;
         return {
           showMatterPanel: opening,
-          showMatterDetailPanel: opening ? false : prevState.showMatterDetailPanel,
+          showMatterDetailPanel: opening
+            ? false
+            : prevState.showMatterDetailPanel,
           showThreadPanel: opening ? false : prevState.showThreadPanel,
           activeThread: opening ? null : prevState.activeThread,
           previewFile: opening ? null : prevState.previewFile,
@@ -246,7 +248,7 @@ export class ChatContentPage extends Component<
     };
     WKApp.mittBus.on(
       "wk:toggle-matter-detail-panel",
-      this._onToggleMatterDetailPanel
+      this._onToggleMatterDetailPanel,
     );
 
     // 检查是否需要自动打开子区面板（查看全部子区）
@@ -295,7 +297,7 @@ export class ChatContentPage extends Component<
           !WKSDK.shared().channelManager.getChannelInfo(this.parentGroupChannel)
         ) {
           WKSDK.shared().channelManager.fetchChannelInfo(
-            this.parentGroupChannel
+            this.parentGroupChannel,
           );
         }
       }
@@ -360,7 +362,7 @@ export class ChatContentPage extends Component<
           !WKSDK.shared().channelManager.getChannelInfo(this.parentGroupChannel)
         ) {
           WKSDK.shared().channelManager.fetchChannelInfo(
-            this.parentGroupChannel
+            this.parentGroupChannel,
           );
         }
       }
@@ -395,7 +397,7 @@ export class ChatContentPage extends Component<
     if (this._onToggleMatterDetailPanel) {
       WKApp.mittBus.off(
         "wk:toggle-matter-detail-panel",
-        this._onToggleMatterDetailPanel
+        this._onToggleMatterDetailPanel,
       );
     }
     WKSDK.shared().channelManager.removeListener(this.channelInfoListener);
@@ -427,13 +429,13 @@ export class ChatContentPage extends Component<
           showThreadPanel || previewFile || showMatterPanel
             ? "wk-chat-threadpanel-open"
             : "",
-          showMatterDetailPanel ? "wk-chat-matter-detail-panel-open" : ""
+          showMatterDetailPanel ? "wk-chat-matter-detail-panel-open" : "",
         )}
       >
         <div
           className={classNames(
             "wk-chat-content-chat",
-            selectionMode ? "wk-chat-content-chat-selection" : undefined
+            selectionMode ? "wk-chat-content-chat-selection" : undefined,
           )}
         >
           <div
@@ -441,32 +443,8 @@ export class ChatContentPage extends Component<
               "wk-chat-conversation-header",
               selectionMode
                 ? "wk-chat-conversation-header-selection"
-                : undefined
+                : undefined,
             )}
-            onClick={() => {
-              if (selectionMode) {
-                return;
-              }
-              // 群聊：点击 header 切换子区面板
-              if (
-                !isThreadChannel &&
-                channel.channelType === ChannelTypeGroup &&
-                WKApp.remoteConfig.threadOn
-              ) {
-                this.setState({
-                  showThreadPanel: !this.state.showThreadPanel,
-                  activeThread: null,
-                  previewFile: null, // 关闭文件预览
-                  activePreviewMessageId: null,
-                  showMatterPanel: false, // 与事项列表面板互斥
-                  showMatterDetailPanel: false, // 与事项详情面板互斥
-                });
-                return;
-              }
-              this.setState({
-                showChannelSetting: !this.state.showChannelSetting,
-              });
-            }}
           >
             <div className="wk-chat-conversation-header-content">
               <div className="wk-chat-conversation-header-left">
@@ -530,14 +508,14 @@ export class ChatContentPage extends Component<
                                 onClick={() => {
                                   if (this.parentGroupChannel) {
                                     WKApp.endpoints.showConversation(
-                                      this.parentGroupChannel
+                                      this.parentGroupChannel,
                                     );
                                   } else {
                                     WKApp.endpoints.showConversation(
                                       new Channel(
                                         channelInfo.orgData.parentGroupNo,
-                                        ChannelTypeGroup
-                                      )
+                                        ChannelTypeGroup,
+                                      ),
                                     );
                                   }
                                 }}
@@ -545,8 +523,8 @@ export class ChatContentPage extends Component<
                                 {WKSDK.shared().channelManager.getChannelInfo(
                                   new Channel(
                                     channelInfo.orgData.parentGroupNo,
-                                    ChannelTypeGroup
-                                  )
+                                    ChannelTypeGroup,
+                                  ),
                                 )?.title || channelInfo.orgData.parentGroupNo}
                               </span>
                               <span className="wk-chat-conversation-header-separator">
@@ -676,7 +654,7 @@ export class ChatContentPage extends Component<
                         threadInfo.shortId,
                         threadInfo.groupNo,
                         threadChannelId,
-                        threadName
+                        threadName,
                       ),
                     });
                   }
@@ -786,7 +764,7 @@ export class ChatContentPage extends Component<
         {showMatterPanel && (
           <div className="wk-thread-panel">
             {WKApp.endpoints.chatMatterPanel(channel, () =>
-              this.setState({ showMatterPanel: false })
+              this.setState({ showMatterPanel: false }),
             )}
           </div>
         )}
@@ -795,7 +773,7 @@ export class ChatContentPage extends Component<
         {showMatterDetailPanel && (
           <div className="wk-matter-detail-panel">
             {WKApp.endpoints.chatMatterDetailPanel(channel, () =>
-              this.setState({ showMatterDetailPanel: false })
+              this.setState({ showMatterDetailPanel: false }),
             )}
           </div>
         )}
@@ -918,11 +896,11 @@ export default class ChatPage extends Component<any, ChatPageState> {
                 threadsByParentForTab.get(c.channel.channelID) ?? [];
               const threadUnread = threads.reduce(
                 (s, t) => s + (t.unread || 0),
-                0
+                0,
               );
               return sum + (c.unread || 0) + threadUnread;
             },
-            0
+            0,
           );
           const dmUnread = vm.conversations.reduce(
             (sum: number, c: ConversationWrap) => {
@@ -931,7 +909,7 @@ export default class ChatPage extends Component<any, ChatPageState> {
               }
               return sum;
             },
-            0
+            0,
           );
           // filter 用于 ConversationList
           const filter: ConvFilter = activeTab === "group" ? "group" : "dm";
@@ -940,7 +918,7 @@ export default class ChatPage extends Component<any, ChatPageState> {
               <div
                 className={classNames(
                   "wk-chat-content",
-                  vm.selectedConversation ? "wk-conversation-open" : undefined
+                  vm.selectedConversation ? "wk-conversation-open" : undefined,
                 )}
               >
                 <div className="wk-chat-content-left">
@@ -1068,11 +1046,11 @@ export default class ChatPage extends Component<any, ChatPageState> {
                                 (channels) => {
                                   if (channels?.length > 0) {
                                     WKApp.endpoints.showConversation(
-                                      channels[0]
+                                      channels[0],
                                     );
                                   }
                                 },
-                                "找人聊天"
+                                "找人聊天",
                               );
                             }}
                           >
@@ -1083,7 +1061,7 @@ export default class ChatPage extends Component<any, ChatPageState> {
                             onClick={() => {
                               const menus = WKApp.shared.chatMenus();
                               const groupMenu = menus.find(
-                                (m) => m.key === "start-group"
+                                (m) => m.key === "start-group",
                               );
                               if (groupMenu?.onClick) groupMenu.onClick();
                             }}
@@ -1103,7 +1081,7 @@ export default class ChatPage extends Component<any, ChatPageState> {
                             vm.reloadRequestConversationList()
                           }
                           onConversationClick={(
-                            conversation: ConversationWrap
+                            conversation: ConversationWrap,
                           ) => {
                             const doSwitch = () => {
                               // 子区：直接进入完整视图（参考 Discord 逻辑）
@@ -1113,11 +1091,11 @@ export default class ChatPage extends Component<any, ChatPageState> {
                               ) {
                                 WKApp.mittBus.emit(
                                   "wk:close-thread-panel",
-                                  undefined
+                                  undefined,
                                 );
                                 vm.selectedConversation = conversation;
                                 WKApp.endpoints.showConversation(
-                                  conversation.channel
+                                  conversation.channel,
                                 );
                                 vm.notifyListener();
                                 return;
@@ -1125,11 +1103,11 @@ export default class ChatPage extends Component<any, ChatPageState> {
                               // 普通会话：关闭子区面板
                               WKApp.mittBus.emit(
                                 "wk:close-thread-panel",
-                                undefined
+                                undefined,
                               );
                               vm.selectedConversation = conversation;
                               WKApp.endpoints.showConversation(
-                                conversation.channel
+                                conversation.channel,
                               );
                               vm.notifyListener();
                             };
@@ -1155,14 +1133,14 @@ export default class ChatPage extends Component<any, ChatPageState> {
                               const groupConv = vm.filteredConversations.find(
                                 (c) =>
                                   c.channel.channelType === ChannelTypeGroup &&
-                                  c.channel.channelID === groupNo
+                                  c.channel.channelID === groupNo,
                               );
                               if (groupConv) {
                                 vm.selectedConversation = groupConv;
                                 vm.notifyListener();
                               }
                               WKApp.endpoints.showConversation(
-                                new Channel(groupNo, ChannelTypeGroup)
+                                new Channel(groupNo, ChannelTypeGroup),
                               );
                             }
                           }}
