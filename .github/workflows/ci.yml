@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build & Lint
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,3 +32,4 @@ jobs:
       # See: https://github.com/Mininglamp-OSS/octo-web/pull/22
       - name: Build
         run: pnpm build
+
