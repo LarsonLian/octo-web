@@ -32,3 +32,28 @@ export function applyRemoteReactions(
     }
     return changed
 }
+
+/**
+ * 取数 + 合并 + 错误处理的纯 core，供 ConversationVM.refreshReactions 委托。
+ * syncMessages / resolveLocal 由调用方注入（生产里是 WKApp 同步 + VM 查找），
+ * 失败路径在此收口：reaction 刷新是被动的非关键更新，一次同步失败**不得**冒泡
+ * 打断 CMD handler，也不该弹用户可见错误——故 catch 后经 onError 记录并返回
+ * false（无变更），而非抛出。
+ * @returns 是否有本地消息被更新（调用方据此决定 notifyListener）。
+ */
+export async function refreshReactionsCore(
+    syncMessages: () => Promise<RemoteReactionSource[] | undefined>,
+    resolveLocal: (messageID: string) => ReactionTarget | undefined,
+    onError: (err: unknown) => void,
+): Promise<boolean> {
+    try {
+        const remote = await syncMessages()
+        if (!remote || remote.length === 0) {
+            return false
+        }
+        return applyRemoteReactions(remote, resolveLocal)
+    } catch (err) {
+        onError(err)
+        return false
+    }
+}

@@ -2,7 +2,7 @@ import { Channel, ChannelTypeGroup, ChannelTypePerson, ConversationAction, WKSDK
 import WKApp from "../../App";
 import { SyncMessageOptions } from "../../Service/DataSource/DataProvider";
 import { MessageWrap } from "../../Service/Model";
-import { applyRemoteReactions } from "./reactionMerge";
+import { refreshReactionsCore } from "./reactionMerge";
 import { ProviderListener } from "../../Service/Provider";
 import { isConversationDisbanded } from "../../Utils/groupDisband";
 import { animateScroll, scroller } from 'react-scroll';
@@ -913,9 +913,9 @@ export default class ConversationVM extends ProviderListener {
                 // 一页消息（reactions 由 Convert.toMessage 聚合带出），把新的
                 // reactions 合并进已渲染的对应 message，再重渲染。
                 if (message.channel.isEqual(this.channel)) {
-                    this.refreshReactions().catch((err) => {
-                        console.error('[ConversationVM] refreshReactions failed:', err)
-                    })
+                    // refreshReactionsCore swallows failures (logs, returns
+                    // false), so this never rejects — fire and forget.
+                    void this.refreshReactions()
                 }
             }
         }
@@ -1352,13 +1352,10 @@ export default class ConversationVM extends ProviderListener {
         opts.limit = WKApp.config.pageSizeOfMessage
         opts.startMessageSeq = 0
         opts.pullMode = PullMode.Down
-        const remoteMessages = await WKApp.conversationProvider.syncMessages(this.channel, opts)
-        if (!remoteMessages || remoteMessages.length === 0) {
-            return
-        }
-        let changed = applyRemoteReactions(
-            remoteMessages,
+        const changed = await refreshReactionsCore(
+            () => WKApp.conversationProvider.syncMessages(this.channel, opts),
             (messageID) => this.findMessageWithMessageID(messageID),
+            (err) => console.error('[ConversationVM] refreshReactions failed:', err),
         )
         if (changed) {
             this.notifyListener()
