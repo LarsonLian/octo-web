@@ -2,8 +2,9 @@ import classNames from "classnames";
 import React from "react";
 import ReactDOM from "react-dom";
 import { Component, ReactNode } from "react";
-import { Toast } from "@douyinfe/semi-ui";
+import { Toast, Modal, Button, Input, TagInput } from "@douyinfe/semi-ui";
 import { EndpointID } from "../../Service/Const";
+import { extractErrorMsg } from "../../Service/APIClient";
 import WKApp from "../../App";
 import { Emoji, EmojiService } from "../../Service/EmojiService";
 import { StickerItem } from "../../Service/DataSource/DataSource";
@@ -135,11 +136,20 @@ export default class EmojiToolbar extends Component<EmojiToolbarProps, EmojiTool
     }
 }
 
+interface StickerEditDraft {
+    placeholder: string
+    shortcode: string
+    keywords: string[]
+}
+
 interface EmojiPanelState {
     emojis: Emoji[]
     category: string
     stickers: StickerItem[]
     uploading: boolean
+    editingSticker: StickerItem | null
+    editDraft: StickerEditDraft
+    editSaving: boolean
 }
 
 interface EmojiPanelProps {
@@ -164,6 +174,9 @@ export class EmojiPanel extends Component<EmojiPanelProps, EmojiPanelState> {
             category: "emoji",
             stickers: [],
             uploading: false,
+            editingSticker: null,
+            editDraft: { placeholder: "", shortcode: "", keywords: [] },
+            editSaving: false,
         }
     }
 
@@ -233,7 +246,10 @@ export class EmojiPanel extends Component<EmojiPanelProps, EmojiPanelState> {
         this.setState({ uploading: true })
         try {
             const uploaded = await WKApp.dataSource.commonDataSource.uploadSticker(file)
-            await WKApp.dataSource.commonDataSource.addSticker({ path: uploaded.path, format: uploaded.format })
+            // handle 原样透传给 addSticker：服务端是否强制校验由 remoteConfig.stickerHandleRequired
+            // 决定（octo-server PR#510），这里始终带上（若拿到）不影响兼容模式，还能让统计口径
+            // 更早收敛到「已带 handle」。
+            await WKApp.dataSource.commonDataSource.addSticker({ path: uploaded.path, format: uploaded.format, handle: uploaded.handle })
             await this.requestStickers()
             if (!this.isUnmounted) {
                 this.setState({ category: STICKER_CATEGORY })
@@ -260,6 +276,54 @@ export class EmojiPanel extends Component<EmojiPanelProps, EmojiPanelState> {
         })
     }
 
+    onEditClick = (e: React.MouseEvent, sticker: StickerItem) => {
+        e.stopPropagation()
+        this.setState({
+            editingSticker: sticker,
+            editDraft: {
+                placeholder: sticker.placeholder || "",
+                shortcode: sticker.shortcode || "",
+                keywords: sticker.keywords || [],
+            },
+        })
+    }
+
+    onEditCancel = () => {
+        if (this.state.editSaving) {
+            return
+        }
+        this.setState({ editingSticker: null })
+    }
+
+    onEditSave = async () => {
+        const { editingSticker, editDraft } = this.state
+        if (!editingSticker) {
+            return
+        }
+        this.setState({ editSaving: true })
+        try {
+            await WKApp.dataSource.commonDataSource.editSticker(editingSticker.sticker_id, {
+                placeholder: editDraft.placeholder,
+                shortcode: editDraft.shortcode,
+                keywords: editDraft.keywords,
+            })
+            if (this.isUnmounted) {
+                return
+            }
+            Toast.success(t("base.sticker.editSuccess"))
+            this.setState({ editingSticker: null })
+            await this.requestStickers()
+        } catch (err) {
+            if (!this.isUnmounted) {
+                Toast.error(extractErrorMsg(err) || t("base.sticker.editFailed"))
+            }
+        } finally {
+            if (!this.isUnmounted) {
+                this.setState({ editSaving: false })
+            }
+        }
+    }
+
     // 按 format 分流：已知位图格式用 <img>，其余(含空/未知/tgs)走 tgs-player，与
     // 聊天气泡里的 LottieStickerCell 共用同一判定(isBitmapStickerFormat)，避免两处
     // 分流口径漂移把历史 .tgs 贴纸喂进 <img>(PR#496 review)。尺寸由 CSS
@@ -273,7 +337,7 @@ export class EmojiPanel extends Component<EmojiPanelProps, EmojiPanelState> {
     }
 
     render(): React.ReactNode {
-        const { emojis, category, stickers, uploading } = this.state
+        const { emojis, category, stickers, uploading, editingSticker, editDraft, editSaving } = this.state
         const { onEmoji, onSticker } = this.props
         const isSticker = category === STICKER_CATEGORY
         return <div className="wk-emojipanel">
@@ -314,6 +378,13 @@ export class EmojiPanel extends Component<EmojiPanelProps, EmojiPanelState> {
                                 }
                             }}>
                                 {this.renderStickerMedia(sticker)}
+                                <span
+                                    className="wk-sticker-edit"
+                                    onClick={(e) => this.onEditClick(e, sticker)}
+                                    title={t("base.sticker.edit")}
+                                >
+                                    <svg viewBox="0 0 24 24" width="11" height="11"><path d="M4 20l1-4.5L15.5 5 19 8.5 8.5 19 4 20z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>
+                                </span>
                                 <span
                                     className="wk-sticker-del"
                                     onClick={(e) => this.onDelete(e, sticker)}
@@ -356,6 +427,50 @@ export class EmojiPanel extends Component<EmojiPanelProps, EmojiPanelState> {
                 accept={ACCEPTED_STICKER_TYPES.join(",")}
                 style={{ display: "none" }}
             />
+            <Modal
+                title={t("base.sticker.editTitle")}
+                visible={!!editingSticker}
+                onCancel={this.onEditCancel}
+                onOk={this.onEditSave}
+                confirmLoading={editSaving}
+                okText={t("base.sticker.editSave")}
+                cancelText={t("base.sticker.editCancel")}
+                maskClosable={false}
+                className="wk-sticker-edit-modal"
+            >
+                {editingSticker ? <div className="wk-sticker-edit-form" onClick={(e) => e.stopPropagation()}>
+                    <div className="wk-sticker-edit-preview">{this.renderStickerMedia(editingSticker)}</div>
+                    <div className="wk-sticker-edit-fields">
+                        <div className="wk-sticker-edit-field">
+                            <label>{t("base.sticker.editPlaceholderLabel")}</label>
+                            <Input
+                                value={editDraft.placeholder}
+                                placeholder={t("base.sticker.editPlaceholderPlaceholder")}
+                                maxLength={30}
+                                onChange={(v) => this.setState({ editDraft: { ...editDraft, placeholder: v } })}
+                            />
+                        </div>
+                        <div className="wk-sticker-edit-field">
+                            <label>{t("base.sticker.editShortcodeLabel")}</label>
+                            <Input
+                                value={editDraft.shortcode}
+                                placeholder={t("base.sticker.editShortcodePlaceholder")}
+                                maxLength={32}
+                                onChange={(v) => this.setState({ editDraft: { ...editDraft, shortcode: v.toLowerCase() } })}
+                            />
+                        </div>
+                        <div className="wk-sticker-edit-field">
+                            <label>{t("base.sticker.editKeywordsLabel")}</label>
+                            <TagInput
+                                value={editDraft.keywords}
+                                placeholder={t("base.sticker.editKeywordsPlaceholder")}
+                                max={10}
+                                onChange={(v) => this.setState({ editDraft: { ...editDraft, keywords: (v || []) as string[] } })}
+                            />
+                        </div>
+                    </div>
+                </div> : null}
+            </Modal>
         </div>
     }
 }
