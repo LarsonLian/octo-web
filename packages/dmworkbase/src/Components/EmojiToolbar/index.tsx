@@ -22,6 +22,10 @@ const STICKER_CATEGORY = "sticker"
 // 服务端是最终防线，这里只是即时反馈、少打一次必失败的请求。
 const MAX_STICKER_BYTES = 1 * 1024 * 1024
 const ACCEPTED_STICKER_TYPES = ["image/gif", "image/png", "image/jpeg", "image/webp"]
+// 与服务端 normalizeStickerShortcode 的校验规则保持一致（octo-server PR#512：
+// ^[a-z0-9_]{2,32}$，大小写在比较前统一转小写）。仅做即时反馈，服务端仍是最终防线；
+// 空字符串合法（代表清空 shortcode），故校验只拦非空且不匹配的情况。
+const STICKER_SHORTCODE_PATTERN = /^[a-z0-9_]{2,32}$/
 
 // 面板尺寸（与 index.css 的 .wk-emojitoolbar-emojipanel 保持一致）与视口避让间距，
 // 用于把面板按按钮位置定位并夹进视口，避免溢出/被祖先裁剪。
@@ -305,11 +309,18 @@ export class EmojiPanel extends Component<EmojiPanelProps, EmojiPanelState> {
         if (!editingSticker) {
             return
         }
+        // 提交前本地校验一次 shortcode 格式：不匹配服务端也会拒绝，但那需要一次多余的
+        // 网络往返；空字符串是合法的"清空"语义，不受此校验拦截。
+        const shortcode = editDraft.shortcode.trim().toLowerCase()
+        if (shortcode && !STICKER_SHORTCODE_PATTERN.test(shortcode)) {
+            Toast.error(t("base.sticker.editShortcodeInvalid"))
+            return
+        }
         this.setState({ editSaving: true })
         try {
             await WKApp.dataSource.commonDataSource.editSticker(editingSticker.sticker_id, {
                 placeholder: editDraft.placeholder,
-                shortcode: editDraft.shortcode,
+                shortcode,
                 keywords: editDraft.keywords,
             })
             if (this.isUnmounted) {

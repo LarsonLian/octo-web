@@ -888,6 +888,7 @@
   "sticker.editPlaceholderPlaceholder": "发送时显示的文本，例如 [微笑]",
   "sticker.editShortcodeLabel": "快捷码",
   "sticker.editShortcodePlaceholder": "小写字母、数字、下划线，2-32 位，例如 smile",
+  "sticker.editShortcodeInvalid": "快捷码格式有误：仅支持小写字母、数字、下划线，2-32 位",
   "sticker.editKeywordsLabel": "关键词",
   "sticker.editKeywordsPlaceholder": "输入后回车添加，用于搜索联想",
   "sticker.editSave": "保存",

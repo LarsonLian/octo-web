@@ -888,6 +888,7 @@
   "sticker.editPlaceholderPlaceholder": "Text shown when sent, e.g. [smile]",
   "sticker.editShortcodeLabel": "Shortcode",
   "sticker.editShortcodePlaceholder": "Lowercase letters, digits, underscore, 2-32 chars, e.g. smile",
+  "sticker.editShortcodeInvalid": "Invalid shortcode: only lowercase letters, digits and underscore, 2-32 characters",
   "sticker.editKeywordsLabel": "Keywords",
   "sticker.editKeywordsPlaceholder": "Press Enter to add, used for search suggestions",
   "sticker.editSave": "Save",
