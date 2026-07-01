@@ -96,16 +96,18 @@ export class Contacts {
 // "user" 哨兵值，沿用 LottieSticker 消息体的 category 字段，发送链路无需改动。
 // sort/shortcode/keywords 是 octo-server PR#512 新增的元数据字段：sort 决定列表顺序
 // （服务端已按 sort ASC, id DESC 排序，前端无需二次排序）；shortcode/keywords 仅用于
-// 客户端展示/编辑，服务端暂未提供基于它们的搜索接口。
+// 客户端展示/编辑，服务端暂未提供基于它们的搜索接口。三者标记可选：PR#512 之前创建的
+// 贴纸，其服务端响应可能不带这几个字段，消费方（EmojiToolbar onEditClick）已用
+// `|| ""` / `|| []` 兜底，这里的类型应如实反映"可能缺失"而非声称恒定存在。
 export interface StickerItem {
     sticker_id: string
     path: string
     category: string
     placeholder: string
     format: string
-    sort: number
-    shortcode: string
-    keywords: string[]
+    sort?: number
+    shortcode?: string
+    keywords?: string[]
 }
 
 export interface ICommonDataSource {

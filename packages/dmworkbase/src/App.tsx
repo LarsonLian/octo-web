@@ -323,6 +323,7 @@ export class WKRemoteConfig {
       const previousMessagesSearchOn = this.messagesSearchOn;
       const previousSuppressLoginMigrationNotice =
         this.suppressLoginMigrationNotice;
+      const previousStickerHandleRequired = this.stickerHandleRequired;
       this.requestSuccess = true;
       this.revokeSecond = result["revoke_second"];
       this.threadOn = !!result["thread_on"];
@@ -343,7 +344,8 @@ export class WKRemoteConfig {
         previousDisableUserCreateSpace !== this.disableUserCreateSpace ||
         previousMessagesSearchOn !== this.messagesSearchOn ||
         previousSuppressLoginMigrationNotice !==
-          this.suppressLoginMigrationNotice
+          this.suppressLoginMigrationNotice ||
+        previousStickerHandleRequired !== this.stickerHandleRequired
       ) {
         this.notifyConfigChangeListeners();
       }

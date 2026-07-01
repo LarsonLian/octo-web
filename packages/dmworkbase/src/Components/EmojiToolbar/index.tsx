@@ -316,7 +316,9 @@ export class EmojiPanel extends Component<EmojiPanelProps, EmojiPanelState> {
                 return
             }
             Toast.success(t("base.sticker.editSuccess"))
-            this.setState({ editingSticker: null })
+            // 同时清 editSaving：否则在下面 requestStickers() 等待期间用户重开另一张贴纸的
+            // 编辑弹窗，会因 editSaving 还没被 finally 清掉而立刻显示一次过期的 loading。
+            this.setState({ editingSticker: null, editSaving: false })
             await this.requestStickers()
         } catch (err) {
             if (!this.isUnmounted) {
@@ -472,7 +474,7 @@ export class EmojiPanel extends Component<EmojiPanelProps, EmojiPanelState> {
                                 value={editDraft.keywords}
                                 placeholder={t("base.sticker.editKeywordsPlaceholder")}
                                 max={10}
-                                onChange={(v) => this.setState({ editDraft: { ...editDraft, keywords: (v || []) as string[] } })}
+                                onChange={(v) => this.setState({ editDraft: { ...editDraft, keywords: (v || []).filter((k): k is string => typeof k === "string") } })}
                             />
                         </div>
                     </div>
