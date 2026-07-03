@@ -15,6 +15,10 @@ export * from './Service/Route'
 export * from './Service/DataSource/DataProvider'
 export { default as ChatPage } from "./Pages/Chat"
 export { default as RuntimesPage } from "./Pages/Runtimes"
+export { default as RuntimeV2Prototype } from "./Pages/RuntimeV2Prototype"
+export { default as AgentsPrototype } from "./Pages/AgentsPrototype"
+export { default as MatterV2Prototype } from "./Pages/MatterV2Prototype"
+export { default as SkillsPrototype } from "./Pages/SkillsPrototype"
 export * from './Components/ChannelSetting/context'
 export * from './Service/DataSource/DataSource'
 export * from './Service/IncomingWebhook'
