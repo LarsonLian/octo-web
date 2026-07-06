@@ -88,14 +88,14 @@ export default function AgentsPrototype() {
                     <span>Bot</span>
                     <strong>{AGENTS.length}</strong>
                 </div>
-                <button type="button" onClick={() => setCreateOpen(true)} aria-label="新建智能体">
+                <button type="button" onClick={() => setCreateOpen(true)} aria-label="新建 Bot">
                     <Plus size={15} />
                 </button>
             </div>
 
             <label className="wk-agents-proto__search">
                 <Search size={15} />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索智能体..." />
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索 Bot..." />
             </label>
 
             <div className="wk-agents-proto__side-list">
@@ -139,7 +139,7 @@ function AgentsListSurface({
     onOpenAgent: (agent: AgentItem) => void
 }) {
     return (
-        <section className="wk-agents-list" aria-label="智能体列表">
+        <section className="wk-agents-list" aria-label="Bot 列表">
             <header className="wk-agents-list__header">
                 <div className="wk-agents-list__title">
                     <Bot size={16} />
@@ -150,7 +150,7 @@ function AgentsListSurface({
                 </div>
                 <button type="button" className="wk-agents-list__create" onClick={onCreate}>
                     <Plus size={15} />
-                    新建智能体
+                    新建 Bot
                 </button>
             </header>
 
@@ -176,9 +176,9 @@ function AgentsListSurface({
                 </div>
             </div>
 
-            <div className="wk-agents-list__table" role="table" aria-label="智能体原型列表">
+            <div className="wk-agents-list__table" role="table" aria-label="Bot 原型列表">
                 <div className="wk-agents-list__row wk-agents-list__head" role="row">
-                    <div role="columnheader">智能体</div>
+                    <div role="columnheader">Bot</div>
                     <div role="columnheader">状态</div>
                     <div role="columnheader">Owner</div>
                     <div role="columnheader">运行时</div>
@@ -227,10 +227,10 @@ function AgentDetailSurface({ agent }: { agent: AgentItem }) {
     const tabs = ["动态", "Tasks", "指令", "Skills", "环境变量", "自定义参数", "MCP"]
 
     return (
-        <section className="wk-agent-detail" aria-label="智能体详情">
+        <section className="wk-agent-detail" aria-label="Bot 详情">
             <header className="wk-agent-detail__top">
                 <div className="wk-agent-detail__crumb">
-                    <span>智能体</span>
+                    <span>Bot</span>
                     <ChevronDown size={14} />
                     <strong>{agent.name}</strong>
                     <em><i />在线</em>
@@ -285,7 +285,7 @@ function AgentDetailSurface({ agent }: { agent: AgentItem }) {
                 </aside>
 
                 <main className="wk-agent-detail__main">
-                    <nav className="wk-agent-detail__tabs" aria-label="智能体详情 tabs">
+                    <nav className="wk-agent-detail__tabs" aria-label="Bot 详情 tabs">
                         {tabs.map((tab) => (
                             <button key={tab} type="button" className={tab === "指令" ? "is-active" : ""}>
                                 {tab}
@@ -324,13 +324,13 @@ function CreateAgentModal({ onClose }: { onClose: () => void }) {
                 className="wk-agent-modal__dialog"
                 role="dialog"
                 aria-modal="true"
-                aria-label="创建智能体"
+                aria-label="创建 Bot"
                 onMouseDown={(event) => event.stopPropagation()}
             >
                 <header className="wk-agent-modal__head">
                     <div>
-                        <h2>创建智能体</h2>
-                        <p>为工作区创建一个新的 AI 智能体。</p>
+                        <h2>创建 Bot</h2>
+                        <p>为工作区创建一个新的 AI Bot。</p>
                     </div>
                     <button type="button" onClick={onClose} aria-label="关闭">
                         <X size={18} />
@@ -345,11 +345,11 @@ function CreateAgentModal({ onClose }: { onClose: () => void }) {
                     <div className="wk-agent-modal__form">
                         <label>
                             <span>名称</span>
-                            <input autoFocus placeholder="例如：深度研究智能体" />
+                            <input autoFocus placeholder="例如：深度研究 Bot" />
                         </label>
                         <label>
                             <span>描述</span>
-                            <input placeholder="这个智能体做什么？" />
+                            <input placeholder="这个 Bot 做什么？" />
                             <small>0 / 255</small>
                         </label>
                     </div>

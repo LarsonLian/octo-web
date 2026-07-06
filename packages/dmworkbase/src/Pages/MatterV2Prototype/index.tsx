@@ -26,7 +26,7 @@ import {
 import WKApp from "../../App"
 import "./index.css"
 
-type MatterView = "inbox" | "issues" | "squads" | "settings"
+type MatterView = "inbox" | "issues" | "coworkers" | "squads" | "settings"
 
 interface MatterThread {
     id: string
@@ -93,6 +93,13 @@ const SQUADS = [
     },
 ]
 
+const COWORKERS = [
+    { id: "cw-prototyper", name: "Prototyper-Codex-MBOT", runtime: "Codex (kaka-mbp)", owner: "lvsijia", lastActive: "今天", runs: 5, archived: false },
+    { id: "cw-analyser", name: "Analyser-CC-MBOT", runtime: "Claude (kaka-mbp)", owner: "lvsijia", lastActive: "3 天前", runs: 5, archived: false },
+    { id: "cw-documenter", name: "Documenter-Worker", runtime: "Claude (kaka-mbp)", owner: "lvsijia", lastActive: "3 天前", runs: 5, archived: false },
+    { id: "cw-triager", name: "Triager-Worker", runtime: "Claude (kaka-mbp)", owner: "lvsijia", lastActive: "30 天内无活动", runs: 0, archived: true },
+]
+
 export default function MatterV2Prototype() {
     const [activeView, setActiveView] = useState<MatterView>("inbox")
     const [activeThreadId, setActiveThreadId] = useState(INBOX_THREADS[0].id)
@@ -122,6 +129,10 @@ export default function MatterV2Prototype() {
         }
         if (view === "issues") {
             WKApp.routeRight.replaceToRoot(<MatterIssuesBoard />)
+            return
+        }
+        if (view === "coworkers") {
+            WKApp.routeRight.replaceToRoot(<MatterCoWorkersList />)
             return
         }
         if (view === "squads") {
@@ -272,6 +283,10 @@ export default function MatterV2Prototype() {
                 </button>
                 <button type="button"><Briefcase size={16} />项目</button>
                 <button type="button"><Sparkles size={16} />自动化</button>
+                <button type="button" className={activeView === "coworkers" ? "is-active" : ""} onClick={() => setView("coworkers")}>
+                    <Bot size={16} />
+                    CoWorker
+                </button>
                 <button type="button" className={activeView === "squads" ? "is-active" : ""} onClick={() => setView("squads")}>
                     <Users size={16} />
                     小队
@@ -468,6 +483,140 @@ function MatterCreateIssueModal({ onClose }: { onClose: () => void }) {
                 </footer>
             </section>
         </div>
+    )
+}
+
+function MatterCoWorkersList() {
+    return (
+        <section className="wk-matter-coworkers" aria-label="MatterV2 CoWorker list">
+            <header className="wk-matter-coworkers__head">
+                <div className="wk-matter-coworkers__title">
+                    <Bot size={17} />
+                    <strong>CoWorker</strong>
+                    <span>{COWORKERS.length}</span>
+                    <p>能领取 issue、留下评论、推进状态的 AI 队友。</p>
+                    <a href="#coworker-learn">了解更多 →</a>
+                </div>
+                <button type="button" className="wk-matter-coworkers__create"><PlusIcon />新建 CoWorker</button>
+            </header>
+
+            <div className="wk-matter-coworkers__toolbar">
+                <div className="wk-matter-coworkers__tabs">
+                    <button type="button" className="is-active">我的 <span>4</span></button>
+                    <button type="button">全部 <span>4</span></button>
+                    <button type="button">已归档 <span>3</span></button>
+                </div>
+                <div className="wk-matter-coworkers__actions">
+                    <button type="button">筛选</button>
+                    <button type="button">最近活跃</button>
+                </div>
+            </div>
+
+            <div className="wk-matter-coworkers__table" role="table" aria-label="CoWorker 列表">
+                <div className="wk-matter-coworkers__row wk-matter-coworkers__head-row" role="row">
+                    <div role="columnheader">CoWorker</div>
+                    <div role="columnheader">状态</div>
+                    <div role="columnheader">Owner</div>
+                    <div role="columnheader">运行时</div>
+                    <div role="columnheader">最近活跃 ↓</div>
+                    <div role="columnheader">运行次数</div>
+                </div>
+                {COWORKERS.map((coworker) => (
+                    <button
+                        key={coworker.id}
+                        type="button"
+                        className="wk-matter-coworkers__row wk-matter-coworkers__item"
+                        role="row"
+                        onClick={() => WKApp.routeRight.replaceToRoot(<MatterCoWorkerDetail coworker={coworker} />)}
+                    >
+                        <div className="wk-matter-coworkers__name" role="cell">
+                            <span><Bot size={16} /><i /></span>
+                            <strong>{coworker.name}</strong>
+                            <em>你</em>
+                        </div>
+                        <div className="wk-matter-coworkers__status" role="cell"><i />在线</div>
+                        <div className="wk-matter-coworkers__owner" role="cell"><span>L</span>{coworker.owner}</div>
+                        <div className="wk-matter-coworkers__muted" role="cell">{coworker.runtime}</div>
+                        <div className={coworker.archived ? "wk-matter-coworkers__quiet" : "wk-matter-coworkers__muted"} role="cell">{coworker.lastActive}</div>
+                        <div className="wk-matter-coworkers__runs" role="cell">{coworker.runs}</div>
+                    </button>
+                ))}
+            </div>
+        </section>
+    )
+}
+
+function MatterCoWorkerDetail({
+    coworker,
+}: {
+    coworker: typeof COWORKERS[number]
+}) {
+    const tabs = ["动态", "Tasks", "指令", "Skills", "环境变量", "自定义参数", "MCP"]
+
+    return (
+        <section className="wk-matter-coworker-detail" aria-label="CoWorker detail">
+            <header className="wk-matter-coworker-detail__top">
+                <div className="wk-matter-coworker-detail__crumb">
+                    <span>CoWorker</span>
+                    <ChevronRight size={13} />
+                    <strong>{coworker.name}</strong>
+                    <em><i />在线</em>
+                </div>
+                <MoreHorizontal size={17} />
+            </header>
+
+            <div className="wk-matter-coworker-detail__layout">
+                <aside className="wk-matter-coworker-detail__profile">
+                    <div className="wk-matter-coworker-detail__identity">
+                        <span><Bot size={28} /></span>
+                        <h2>{coworker.name}</h2>
+                        <p>暂无描述</p>
+                        <em><i />在线</em>
+                    </div>
+                    <dl>
+                        <dt>属性</dt>
+                        <div><span>运行时</span><strong>{coworker.runtime}<i /></strong></div>
+                        <div><span>模型</span><strong>gpt-5.5</strong></div>
+                        <div><span>可见性</span><strong>Workspace</strong></div>
+                        <div><span>并发</span><strong>6</strong></div>
+                    </dl>
+                    <dl>
+                        <dt>详情</dt>
+                        <div><span>所有者</span><strong><b>L</b>{coworker.owner}</strong></div>
+                        <div><span>创建时间</span><strong>3 天前</strong></div>
+                        <div><span>更新时间</span><strong>1 小时前</strong></div>
+                    </dl>
+                    <div className="wk-matter-coworker-detail__skills">
+                        <strong>SKILLS <span>9</span></strong>
+                        <p>{["lark-base", "lark-doc", "lark-drive", "lark-event", "lark-markdown", "lark-openapi-explorer", "lark-sheets", "lark-skill-maker", "lark-wiki"].map((skill) => <em key={skill}>{skill}</em>)}<button type="button">+ 附加</button></p>
+                    </div>
+                </aside>
+
+                <main className="wk-matter-coworker-detail__main">
+                    <nav className="wk-matter-coworker-detail__tabs">
+                        {tabs.map((tab, index) => (
+                            <button key={tab} type="button" className={index === 0 ? "is-active" : ""}>{tab}</button>
+                        ))}
+                    </nav>
+                    <div className="wk-matter-coworker-detail__cards">
+                        <section>
+                            <strong>当前 <span>无进行中的工作</span></strong>
+                            <p>这个 CoWorker 当前没有在跑任何 task。</p>
+                        </section>
+                        <section className="wk-matter-coworker-detail__metric">
+                            <span>近 30 天　表现</span>
+                            <strong>{coworker.runs}</strong>
+                            <p>100% 成功 · 平均 12s</p>
+                            <i />
+                        </section>
+                        <section>
+                            <strong>最近工作 <span>还没有完成的 task</span></strong>
+                            <p>这个 CoWorker 还没有完成过任何 task。</p>
+                        </section>
+                    </div>
+                </main>
+            </div>
+        </section>
     )
 }
 
