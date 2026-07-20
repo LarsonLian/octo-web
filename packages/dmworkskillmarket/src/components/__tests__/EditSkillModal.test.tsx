@@ -88,8 +88,9 @@ describe("EditSkillModal", () => {
 
     expect(screen.getByDisplayValue("1.1.3")).toBeInTheDocument();
     expect(screen.getByDisplayValue("会议纪要整理")).toBeInTheDocument();
-    expect(screen.getByText("meeting-note-cleaner.zip")).toBeInTheDocument();
-    expect(screen.getByText(reuploadButton)).toBeInTheDocument();
+    expect(screen.getByText(/技能名|skillMarket\.upload\.skillName/)).toBeInTheDocument();
+    expect(screen.queryByText("meeting-note-cleaner.zip")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: reuploadButton })).toHaveTextContent(/重新上传|skillMarket\.upload\.reuploadShort/);
 
     fireEvent.change(screen.getByPlaceholderText(displayNamePlaceholder), { target: { value: "更新展示名" } });
     fireEvent.change(screen.getByLabelText(/分类|skillMarket\.form\.category/), { target: { value: "dev-tools" } });
@@ -158,7 +159,7 @@ describe("EditSkillModal", () => {
   it("can re-upload a Skill package and save the new file metadata", async () => {
     render(<EditSkillModal skill={skill} categories={categories} onClose={vi.fn()} onUpdated={vi.fn()} />);
 
-    fireEvent.click(screen.getByText(reuploadButton));
+    fireEvent.click(screen.getByRole("button", { name: reuploadButton }));
 
     await act(async () => {
       fireEvent.change(screen.getByLabelText(selectNewZipLabel), {
@@ -168,7 +169,7 @@ describe("EditSkillModal", () => {
 
     // Wait for the upload/parse flow to complete
     await waitFor(() => {
-      expect(screen.getByText("updated-skill.skill")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("1.1.4")).toBeInTheDocument();
     });
 
     expect(api.initReupload).toHaveBeenCalledWith("meeting-note-cleaner", "updated-skill.skill", 3);
@@ -176,7 +177,6 @@ describe("EditSkillModal", () => {
     expect(api.triggerParse).toHaveBeenCalledWith("reupload-456");
     expect(api.pollParse).toHaveBeenCalledWith("task-456");
 
-    expect(screen.getByDisplayValue("1.1.4")).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText(changelogPlaceholder), { target: { value: "修复环境检测逻辑" } });
     fireEvent.click(screen.getByRole("button", { name: saveButton }));
 
@@ -207,7 +207,7 @@ describe("EditSkillModal", () => {
 
     render(<EditSkillModal skill={skill} categories={categories} onClose={vi.fn()} onUpdated={vi.fn()} />);
 
-    fireEvent.click(screen.getByText(reuploadButton));
+    fireEvent.click(screen.getByRole("button", { name: reuploadButton }));
 
     await act(async () => {
       fireEvent.change(screen.getByLabelText(selectNewZipLabel), {
@@ -216,7 +216,7 @@ describe("EditSkillModal", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("updated-skill.zip")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("1.1.4")).toBeInTheDocument();
     });
 
     fireEvent.change(screen.getByPlaceholderText(changelogPlaceholder), { target: { value: "修复环境检测逻辑" } });
@@ -246,7 +246,7 @@ describe("EditSkillModal", () => {
 
     render(<EditSkillModal skill={skill} categories={categories} onClose={vi.fn()} onUpdated={vi.fn()} />);
 
-    fireEvent.click(screen.getByText(reuploadButton));
+    fireEvent.click(screen.getByRole("button", { name: reuploadButton }));
 
     await act(async () => {
       fireEvent.change(screen.getByLabelText(selectNewZipLabel), {
@@ -258,7 +258,7 @@ describe("EditSkillModal", () => {
       expect(screen.getByText(/SKILL\.md 中的 name 必须保持为 meeting-note-cleaner，当前为 renamed-skill|skillMarket\.upload\.nameMismatch/)).toBeInTheDocument();
     });
 
-    expect(screen.getByText("meeting-note-cleaner.zip")).toBeInTheDocument();
+    expect(screen.queryByText("meeting-note-cleaner.zip")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: saveButton })).toBeDisabled();
     expect(api.updateSkill).not.toHaveBeenCalled();
   });
@@ -271,7 +271,7 @@ describe("EditSkillModal", () => {
 
     render(<EditSkillModal skill={skill} categories={categories} onClose={vi.fn()} onUpdated={vi.fn()} />);
 
-    fireEvent.click(screen.getByText(reuploadButton));
+    fireEvent.click(screen.getByRole("button", { name: reuploadButton }));
 
     await act(async () => {
       fireEvent.change(screen.getByLabelText(selectNewZipLabel), {
@@ -283,7 +283,7 @@ describe("EditSkillModal", () => {
       expect(screen.getByText("zip 包中未找到 SKILL.md")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("meeting-note-cleaner.zip")).toBeInTheDocument();
+    expect(screen.queryByText("meeting-note-cleaner.zip")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: saveButton })).toBeDisabled();
     expect(api.updateSkill).not.toHaveBeenCalled();
   });
