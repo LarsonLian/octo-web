@@ -43,6 +43,17 @@ const skill: Skill = {
 };
 
 vi.mock("../../api/skillApi");
+vi.mock("react-avatar-editor", async () => {
+  const React = await import("react");
+  const AvatarEditor = React.forwardRef((_props: unknown, ref: React.ForwardedRef<{ getImageScaledToCanvas: () => HTMLCanvasElement }>) => {
+    React.useImperativeHandle(ref, () => ({
+      getImageScaledToCanvas: () => document.createElement("canvas"),
+    }));
+    return React.createElement("canvas", { "data-testid": "avatar-editor" });
+  });
+  AvatarEditor.displayName = "AvatarEditorMock";
+  return { default: AvatarEditor };
+});
 
 describe("EditSkillModal", () => {
   beforeEach(() => {
@@ -103,6 +114,42 @@ describe("EditSkillModal", () => {
     })));
     expect(onUpdated).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("opens the hidden icon file input and shows the crop dialog after selecting an image", async () => {
+    const { container } = render(<EditSkillModal skill={skill} categories={categories} onClose={vi.fn()} onUpdated={vi.fn()} />);
+    const iconInput = container.querySelector<HTMLInputElement>(".skill-market-icon-upload__input");
+    expect(iconInput).toBeTruthy();
+    const clickSpy = vi.spyOn(iconInput!, "click").mockImplementation(() => undefined);
+
+    fireEvent.click(screen.getByRole("button", { name: /上传图标|skillMarket\.form\.uploadIcon/ }));
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(iconInput!, {
+      target: { files: [new File(["png"], "icon.png", { type: "image/png" })] },
+    });
+
+    expect(screen.getByRole("dialog", { name: /裁剪图标|skillMarket\.crop\.title/ })).toBeInTheDocument();
+  });
+
+  it("ignores duplicate save clicks while the update is pending", async () => {
+    let resolveUpdate: (value: typeof skill) => void = () => {};
+    vi.mocked(api.updateSkill).mockReturnValue(
+      new Promise((resolve) => {
+        resolveUpdate = resolve;
+      }) as ReturnType<typeof api.updateSkill>,
+    );
+    const onUpdated = vi.fn();
+    render(<EditSkillModal skill={skill} categories={categories} onClose={vi.fn()} onUpdated={onUpdated} />);
+
+    fireEvent.change(screen.getByPlaceholderText(displayNamePlaceholder), { target: { value: "更新展示名" } });
+    const save = screen.getByRole("button", { name: saveButton });
+    fireEvent.click(save);
+    fireEvent.click(save);
+
+    expect(api.updateSkill).toHaveBeenCalledTimes(1);
+    resolveUpdate({ ...skill, displayName: "更新展示名" });
+    await waitFor(() => expect(onUpdated).toHaveBeenCalledTimes(1));
   });
 
   it("blocks save while a tag validation error is visible", () => {
