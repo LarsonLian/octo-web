@@ -14,6 +14,7 @@ import { parseThreadChannelId } from "../../Service/Thread";
 import { ShowConversationOptions } from "../../EndpointCommon";
 import { Space, SpaceService } from "../../Service/SpaceService";
 import { isSafeUrl } from "../../Utils/security";
+import { isSelfNoLongerInGroup } from "../../Utils/groupMembership";
 import { downloadFile } from "../../Utils/download";
 import {
     addImConnectStatusListener,
@@ -313,6 +314,16 @@ export class ChatVM extends ProviderListener {
                     return
                 }
             }
+
+            // 群解散/被踢/退群（channelInfo.orgData.status===2 或自己不在成员列表）：立即从最近列表移除该群及子区
+            if (channelInfo.channel?.channelType === ChannelTypeGroup && isSelfNoLongerInGroup(channelInfo.channel)) {
+                this.removeConversation(channelInfo.channel)
+                this.removeThreadsOfParent(channelInfo.channel.channelID)
+                WKSDK.shared().conversationManager.removeConversation(channelInfo.channel)
+                this._closeOpenChannelIfMatch(channelInfo.channel)
+                return
+            }
+
             const conversation = this.findConversation(channelInfo.channel)
             if (conversation) {
                 conversation.extra.top = channelInfo.top ? 1 : 0
@@ -370,11 +381,15 @@ export class ChatVM extends ProviderListener {
         }
         WKApp.shared.addMessageDeleteListener(this.messageDeleteListener)
 
+        // 订阅者变更监听：成员被踢/退群后 syncSubscribes 完成时触发，检查自己是否已不在群中
+        WKSDK.shared().channelManager.addSubscriberChangeListener(this._subscriberChangeListener)
+
     }
     didUnMount(): void {
         removeImConnectStatusListener(WKSDK.shared(), this.connectStatusListener)
         WKSDK.shared().conversationManager.removeConversationListener(this.conversationListener)
         WKSDK.shared().channelManager.removeListener(this.channelListener)
+        WKSDK.shared().channelManager.removeSubscriberChangeListener(this._subscriberChangeListener)
         WKApp.shared.removeMessageDeleteListener(this.messageDeleteListener)
         if (this.spaceChangedHandler) {
             WKApp.mittBus.off('space-changed', this.spaceChangedHandler)
@@ -420,7 +435,7 @@ export class ChatVM extends ProviderListener {
 
     /**
      * 移除挂在指定父群下的所有 CommunityTopic（子区）会话。
-     * 当父群 channelInfo 到达且发现父群不属于当前 Space 时调用，
+     * 当父群 channelInfo 到达且发现父群不属于当前 Space、或父群已被退出/解散时调用，
      * 否则子区会以 fail-open 的姿态滞留在列表里。
      */
     removeThreadsOfParent(parentGroupNo: string) {
@@ -437,6 +452,38 @@ export class ChatVM extends ProviderListener {
             return true
         })
         if (mutated) this.notifyListener()
+    }
+
+    /**
+     * 订阅者变更回调：syncSubscribes 完成后检查当前用户是否仍在群里，
+     * 不在则将该群及其子区从最近列表移除并关闭正在查看的聊天窗口（覆盖被踢/主动退群后的本地清理）。
+     */
+    private _subscriberChangeListener = (channel: Channel) => {
+        if (channel.channelType !== ChannelTypeGroup) return
+        if (isSelfNoLongerInGroup(channel)) {
+            this.removeConversation(channel)
+            this.removeThreadsOfParent(channel.channelID)
+            WKSDK.shared().conversationManager.removeConversation(channel)
+            this._closeOpenChannelIfMatch(channel)
+            // 若当前正在查看该群下的子区，一并关闭
+            const open = WKApp.shared.openChannel
+            if (open?.channelType === ChannelTypeCommunityTopic) {
+                const parsed = parseThreadChannelId(open.channelID)
+                if (parsed?.groupNo === channel.channelID) {
+                    WKApp.shared.openChannel = undefined
+                    WKApp.routeRight.popToRoot()
+                }
+            }
+        }
+    }
+
+    /** 如果当前正在查看被移除的群/子区，关闭右侧聊天面板 */
+    private _closeOpenChannelIfMatch(channel: Channel) {
+        const open = WKApp.shared.openChannel
+        if (open?.isEqual(channel)) {
+            WKApp.shared.openChannel = undefined
+            WKApp.routeRight.popToRoot()
+        }
     }
 
     async clearMessages(channel: Channel) {
@@ -578,6 +625,11 @@ export class ChatVM extends ProviderListener {
                     continue
                 }
                 if (shouldSkipPersonConversationForSpace(conversation)) continue
+                // 过滤已退出/被踢/已解散的群：sync 响应可能仍包含这些会话，
+                // 后端不再推送 conversationDeleted CMD 时这里做兜底过滤。
+                if (isSelfNoLongerInGroup(conversation.channel)) {
+                    continue
+                }
                 conversationWraps.push(new ConversationWrap(conversation))
                 filteredForSdk.push(conversation)
             }
@@ -613,6 +665,10 @@ export class ChatVM extends ProviderListener {
                     continue
                 }
                 if (shouldSkipPersonConversationForSpace(conversation)) continue
+                // 过滤已退出/被踢/已解散的群（重连场景兜底）
+                if (isSelfNoLongerInGroup(conversation.channel)) {
+                    continue
+                }
                 if (conversation.lastMessage?.content && conversation.lastMessage?.contentType == MessageContentType.text) {
                     conversation.lastMessage.content.text = ProhibitwordsService.shared.filter(conversation.lastMessage.content.text)
                 }
