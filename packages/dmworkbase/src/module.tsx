@@ -82,7 +82,7 @@ import { TypingCell } from "./Messages/Typing";
 import { LottieSticker, LottieStickerCell } from "./Messages/LottieSticker";
 import { buildAddStickerMenu } from "./Messages/LottieSticker/collectMenu";
 import { isMessageReactionEnabled } from "./Service/featureFlags";
-import { reactionPickerOverlay } from "./ui/message/MessageReactionPicker/ReactionPickerOverlay";
+import { reactionPickerOverlay, enablePointerTracking } from "./ui/message/MessageReactionPicker/ReactionPickerOverlay";
 import { LocationCell, LocationContent } from "./Messages/Location";
 import { Toast, Tag } from "@douyinfe/semi-ui";
 import { ChannelSettingManager } from "./Service/ChannelSetting";
@@ -917,6 +917,13 @@ export default class BaseModule implements IModule {
       },
       1200
     );
+
+    // 仅在 feature flag 打开时安装 reaction picker 的全局指针追踪（右键菜单项
+    // onClick 拿不到坐标，需靠它定位 picker）。flag 关时不安装 → 生产会话零全局
+    // 副作用，兑现「flag OFF = 运行时 no-op」。DEV 改 localStorage 后刷新会重跑此处。
+    if (isMessageReactionEnabled()) {
+      enablePointerTracking();
+    }
 
     WKApp.endpoints.registerMessageContextMenus(
       "contextmenus.forward",

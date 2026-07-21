@@ -23,10 +23,16 @@ const LOCAL_OVERRIDE_KEY = "octo:ff:message-reaction"
 export function isMessageReactionEnabled(): boolean {
   // localStorage 覆盖仅限开发构建：避免生产用户手动打开开关看到本地 mock 的
   // 伪造 reaction 数据。生产环境只认 DEFAULT_ENABLED（后续替换为 appconfig）。
+  // try/catch：存储被禁用 / 分区（隐私模式、跨站隔离）时访问 localStorage 会抛
+  // SecurityError；本函数在消息渲染与右键构建期间调用，抛出会弄挂聊天视图，故兜底。
   if (import.meta.env.DEV && typeof localStorage !== "undefined") {
-    const v = localStorage.getItem(LOCAL_OVERRIDE_KEY)
-    if (v === "1") return true
-    if (v === "0") return false
+    try {
+      const v = localStorage.getItem(LOCAL_OVERRIDE_KEY)
+      if (v === "1") return true
+      if (v === "0") return false
+    } catch {
+      // 存储不可用，忽略本地覆盖，回落到默认值
+    }
   }
   return DEFAULT_ENABLED
 }

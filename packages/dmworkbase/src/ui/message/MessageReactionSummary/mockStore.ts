@@ -26,7 +26,9 @@ function hashString(s: string): number {
     h = (h << 5) - h + s.charCodeAt(i)
     h |= 0
   }
-  return Math.abs(h)
+  // 无符号转换（>>> 0）而非 Math.abs：Math.abs(-2147483648) 仍为负，会产生负索引；
+  // >>> 0 保证落在 [0, 2^32) 内的非负整数。
+  return h >>> 0
 }
 
 function currentUid(): string {

@@ -38,15 +38,31 @@ interface OpenOptions {
 }
 
 // 记录最后一次指针位置，供右键菜单项 onClick（拿不到 event）定位 picker。
-// typeof 守卫避免 SSR / 单测环境副作用。
+// 关键：监听不在模块加载时安装（否则 flag 关的生产会话也会永久挂上全局 capture
+// 监听，违背「flag OFF = 运行时 no-op」的承诺）。改为由 enablePointerTracking()
+// 在 feature flag 打开时显式、幂等安装，disablePointerTracking() 拆除。
 const lastPointer = { x: 0, y: 0 }
-if (typeof document !== "undefined") {
-  const track = (e: MouseEvent) => {
-    lastPointer.x = e.clientX
-    lastPointer.y = e.clientY
-  }
-  document.addEventListener("contextmenu", track, true)
-  document.addEventListener("mousedown", track, true)
+let pointerTrackingOn = false
+
+function trackPointer(e: MouseEvent): void {
+  lastPointer.x = e.clientX
+  lastPointer.y = e.clientY
+}
+
+/** feature flag 打开时安装指针追踪（幂等）。flag 关时永不调用 → 零全局副作用。 */
+export function enablePointerTracking(): void {
+  if (pointerTrackingOn || typeof document === "undefined") return
+  document.addEventListener("contextmenu", trackPointer, true)
+  document.addEventListener("mousedown", trackPointer, true)
+  pointerTrackingOn = true
+}
+
+/** 拆除指针追踪（对称清理，便于 HMR / 关闭功能 / 测试）。 */
+export function disablePointerTracking(): void {
+  if (!pointerTrackingOn || typeof document === "undefined") return
+  document.removeEventListener("contextmenu", trackPointer, true)
+  document.removeEventListener("mousedown", trackPointer, true)
+  pointerTrackingOn = false
 }
 
 /** 把浮窗尺寸夹进视口，优先在点击点上方弹出（贴近右键菜单习惯），空间不足则下方。 */
