@@ -5,6 +5,8 @@ import type { Category, NewSkillForm } from "../types/skill";
 import { createSkill, getSkillTags, initUpload, uploadFile, uploadIcon, triggerParse, pollParse } from "../api/skillApi";
 import { MAX_SKILL_TAGS, validateSkillTag } from "../utils/format";
 import { getSkillAvatarColor, getSkillAvatarText } from "../utils/skillAvatar";
+import { useSkillIconUpload } from "../hooks/useSkillIconUpload";
+import { SKILL_ICON_ACCEPT } from "../utils/iconFile";
 import IconCropModal from "./IconCropModal";
 
 interface NewSkillModalProps {
@@ -38,7 +40,6 @@ export default function NewSkillModal({ visible, categories, onClose, onCreated 
     [categories],
   );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const iconInputRef = useRef<HTMLInputElement | null>(null);
   const tagFieldRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef(false);
   const [stage, setStage] = useState<UploadStage>("idle");
@@ -73,6 +74,15 @@ export default function NewSkillModal({ visible, categories, onClose, onCreated 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState<"busy" | "dirty" | null>(null);
+  const {
+    iconInputRef,
+    handleIconClick,
+    handleIconInputClick,
+    handleIconFileChange,
+  } = useSkillIconUpload({
+    onError: setError,
+    onCropFile: setIconCropFile,
+  });
 
   const busy = stage === "uploading" || stage === "parsing";
   const dirty = Boolean(
@@ -131,19 +141,6 @@ export default function NewSkillModal({ visible, categories, onClose, onCreated 
       width: rect.width,
       maxHeight,
     });
-  }
-
-  function handleIconClick() {
-    iconInputRef.current?.click();
-  }
-
-  function handleIconInputClick(event: React.MouseEvent<HTMLInputElement>) {
-    event.currentTarget.value = "";
-  }
-
-  function handleIconFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const f = event.currentTarget.files?.[0];
-    if (f) setIconCropFile(f);
   }
 
   useEffect(() => () => { abortRef.current = true; }, []);
@@ -527,7 +524,7 @@ export default function NewSkillModal({ visible, categories, onClose, onCreated 
               ref={iconInputRef}
               className="skill-market-icon-upload__input"
               type="file"
-              accept="image/*"
+              accept={SKILL_ICON_ACCEPT}
               multiple={false}
               onClick={handleIconInputClick}
               onChange={handleIconFileChange}

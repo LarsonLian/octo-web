@@ -38,6 +38,7 @@ const leaveButton = /确认离开|skillMarket\.confirm\.leave/;
 const tagLimit = /最多添加 5 个标签|skillMarket\.form\.tagLimit/;
 const tagLengthLimit = /单个标签最多 24 个字符|skillMarket\.form\.tagLengthLimit/;
 const tagInvalidChars = /标签仅支持文字、数字、空格和 - _ \. \/ # \+|skillMarket\.form\.tagInvalidChars/;
+const iconInvalidFormat = /图标仅支持 PNG、JPG、WebP 格式|skillMarket\.upload\.iconInvalidFormat/;
 
 function zipFile(name = "skill-pack.zip", size = 1024 * 1024) {
   return new File(["x".repeat(Math.min(size, 1024))], name, { type: "application/zip" });
@@ -153,6 +154,29 @@ describe("NewSkillModal", () => {
     });
 
     expect(screen.getByRole("dialog", { name: /裁剪图标|skillMarket\.crop\.title/ })).toBeInTheDocument();
+  });
+
+  it("rejects unsupported icon files before opening the crop dialog", async () => {
+    const { container } = render(<NewSkillModal visible categories={categories} onClose={vi.fn()} onCreated={vi.fn()} />);
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(selectZipLabel), {
+        target: { files: [skillFile()] },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("skill-pack.skill")).toBeInTheDocument();
+    });
+
+    const iconInput = container.querySelector<HTMLInputElement>(".skill-market-icon-upload__input");
+    expect(iconInput).toBeTruthy();
+    fireEvent.change(iconInput!, {
+      target: { files: [new File(["svg"], "icon.svg", { type: "image/svg+xml" })] },
+    });
+
+    expect(screen.getByText(iconInvalidFormat)).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /裁剪图标|skillMarket\.crop\.title/ })).not.toBeInTheDocument();
   });
 
   it("disables create until required fields are filled", async () => {

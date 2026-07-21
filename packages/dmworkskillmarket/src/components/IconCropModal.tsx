@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import AvatarEditor from "react-avatar-editor";
 import { t, useI18n, WKButton, WKModal } from "@octo/base";
 
@@ -9,10 +9,16 @@ interface IconCropModalProps {
   onConfirm: (blob: Blob) => void;
 }
 
+const DEFAULT_ICON_SCALE = 1.2;
+
 export default function IconCropModal({ visible, file, onCancel, onConfirm }: IconCropModalProps) {
   useI18n();
   const editorRef = useRef<AvatarEditor | null>(null);
-  const [scale, setScale] = useState(1.2);
+  const [scale, setScale] = useState(DEFAULT_ICON_SCALE);
+
+  useEffect(() => {
+    setScale(DEFAULT_ICON_SCALE);
+  }, [file]);
 
   function handleSave() {
     const canvas = editorRef.current?.getImageScaledToCanvas();

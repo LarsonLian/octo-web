@@ -20,6 +20,7 @@ const dirtyEditMessage = /确定离开？尚未完成编辑，已上传的文件
 const keepEditing = /继续编辑|skillMarket\.confirm\.keepEditing/;
 const leaveButton = /确认离开|skillMarket\.confirm\.leave/;
 const tagPlaceholder = /输入或选择标签|skillMarket\.form\.tagPlaceholder/;
+const iconInvalidFormat = /图标仅支持 PNG、JPG、WebP 格式|skillMarket\.upload\.iconInvalidFormat/;
 
 const skill: Skill = {
   id: "meeting-note-cleaner",
@@ -130,6 +131,19 @@ describe("EditSkillModal", () => {
     });
 
     expect(screen.getByRole("dialog", { name: /裁剪图标|skillMarket\.crop\.title/ })).toBeInTheDocument();
+  });
+
+  it("rejects unsupported icon files before opening the crop dialog", () => {
+    const { container } = render(<EditSkillModal skill={skill} categories={categories} onClose={vi.fn()} onUpdated={vi.fn()} />);
+    const iconInput = container.querySelector<HTMLInputElement>(".skill-market-icon-upload__input");
+    expect(iconInput).toBeTruthy();
+
+    fireEvent.change(iconInput!, {
+      target: { files: [new File(["svg"], "icon.svg", { type: "image/svg+xml" })] },
+    });
+
+    expect(screen.getByText(iconInvalidFormat)).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /裁剪图标|skillMarket\.crop\.title/ })).not.toBeInTheDocument();
   });
 
   it("ignores duplicate save clicks while the update is pending", async () => {

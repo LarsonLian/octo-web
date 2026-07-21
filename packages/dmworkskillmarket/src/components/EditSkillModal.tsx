@@ -5,6 +5,8 @@ import type { Category, Skill } from "../types/skill";
 import { updateSkill, uploadIcon, initReupload, uploadFile, triggerParse, pollParse, getSkillTags } from "../api/skillApi";
 import { MAX_SKILL_TAGS, validateSkillTag } from "../utils/format";
 import { getSkillAvatarColor, getSkillAvatarText } from "../utils/skillAvatar";
+import { useSkillIconUpload } from "../hooks/useSkillIconUpload";
+import { SKILL_ICON_ACCEPT } from "../utils/iconFile";
 import IconCropModal from "./IconCropModal";
 
 interface EditSkillModalProps {
@@ -41,7 +43,6 @@ export default function EditSkillModal({ skill, categories, onClose, onUpdated }
     [categories],
   );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const iconInputRef = useRef<HTMLInputElement | null>(null);
   const tagFieldRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef(false);
   const [name, setName] = useState("");
@@ -74,6 +75,15 @@ export default function EditSkillModal({ skill, categories, onClose, onUpdated }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const {
+    iconInputRef,
+    handleIconClick,
+    handleIconInputClick,
+    handleIconFileChange,
+  } = useSkillIconUpload({
+    onError: setError,
+    onCropFile: setIconCropFile,
+  });
 
   useEffect(() => () => { abortRef.current = true; }, []);
 
@@ -160,19 +170,6 @@ export default function EditSkillModal({ skill, categories, onClose, onUpdated }
       width: rect.width,
       maxHeight,
     });
-  }
-
-  function handleIconClick() {
-    iconInputRef.current?.click();
-  }
-
-  function handleIconInputClick(event: React.MouseEvent<HTMLInputElement>) {
-    event.currentTarget.value = "";
-  }
-
-  function handleIconFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const f = event.currentTarget.files?.[0];
-    if (f) setIconCropFile(f);
   }
 
   function requestClose() {
@@ -526,7 +523,7 @@ export default function EditSkillModal({ skill, categories, onClose, onUpdated }
               ref={iconInputRef}
               className="skill-market-icon-upload__input"
               type="file"
-              accept="image/*"
+              accept={SKILL_ICON_ACCEPT}
               multiple={false}
               onClick={handleIconInputClick}
               onChange={handleIconFileChange}

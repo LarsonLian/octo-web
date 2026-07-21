@@ -90,8 +90,11 @@ export default function SkillCard({ skill, categories: _categories, onOpen, onEd
   const hasSeparateCreator = Boolean(skill.creatorId && skill.ownerId && skill.creatorId !== skill.ownerId);
   const creatorId = skill.creatorId || skill.ownerId;
   const creatorName = skill.creatorName || skill.ownerName;
+  const hasDistinctCreatorName = Boolean(creatorName && creatorName !== skill.ownerName);
+  // TODO(skill-api): replace this legacy ID suffix heuristic with an explicit
+  // creator_type / creator_kind field once the marketplace API exposes one.
   const isBotCreator = hasSeparateCreator && creatorId.endsWith("_bot");
-  const ownerLabel = hasSeparateCreator
+  const ownerLabel = hasSeparateCreator && hasDistinctCreatorName
     ? (isBotCreator ? creatorName : `@${creatorName} · @${skill.ownerName}`)
     : `@${skill.ownerName}`;
   const showOwner = skill.visibility !== "public";

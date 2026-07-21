@@ -111,10 +111,17 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
       onSelectedTagsChange?.([]);
     }
 
-    function clearSearch() {
-      onChange("");
-      inputRef.current?.focus();
+  function clearSearch() {
+    onChange("");
+    inputRef.current?.focus();
+  }
+
+  function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape" && value) {
+      event.preventDefault();
+      clearSearch();
     }
+  }
 
     return (
       <div ref={rootRef} className="skill-market-search">
@@ -125,6 +132,7 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
             type="search"
             value={value}
             onChange={(event) => onChange(event.target.value)}
+            onKeyDown={handleSearchKeyDown}
             placeholder={placeholder}
             aria-label={placeholder}
             autoFocus={autoFocus}
@@ -133,8 +141,8 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
             <button
               type="button"
               className="skill-market-search__clear"
-              aria-label={t("skillMarket.filter.clear")}
-              title={t("skillMarket.filter.clear")}
+              aria-label={t("skillMarket.filter.clearSearch")}
+              title={t("skillMarket.filter.clearSearch")}
               onClick={clearSearch}
             >
               <X size={18} aria-hidden="true" />
@@ -214,6 +222,8 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
                     </span>
                     <button
                       type="button"
+                      aria-label={t("skillMarket.filter.clearTags")}
+                      title={t("skillMarket.filter.clearTags")}
                       onClick={clearTags}
                       disabled={selectedTags.length === 0}
                     >

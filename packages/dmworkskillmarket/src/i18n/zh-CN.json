@@ -53,7 +53,9 @@
     "noTags": "没有匹配标签",
     "noTagsSelected": "未选择标签",
     "tagsSelected": "已选择标签",
-    "clear": "清空"
+    "clear": "清空",
+    "clearSearch": "清空搜索",
+    "clearTags": "清空已选标签"
   },
   "sort": {
     "ariaLabel": "Skill 排序",
@@ -136,6 +138,8 @@
   "upload": {
     "invalidFormat": "文件格式不正确",
     "fileTooLarge": "文件超过 20MB",
+    "iconInvalidFormat": "图标仅支持 PNG、JPG、WebP 格式",
+    "iconFileTooLarge": "图标文件超过 2MB",
     "dropzoneTitle": "上传 Skill 包（.zip / .skill）",
     "dropzoneHint": "Skill 包内需包含 SKILL.md 文件",
     "parseAutofillHint": "Skill 包内需包含 SKILL.md，解析后自动填充下方信息",

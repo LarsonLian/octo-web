@@ -62,7 +62,8 @@ const tagFilterName = /标签|skillMarket\.filter\.tags/;
 const tagSearchPlaceholder = /搜索标签|skillMarket\.filter\.searchTags/;
 const selectedTagsText = /已选择标签|skillMarket\.filter\.tagsSelected/;
 const noSelectedTagsText = /未选择标签|skillMarket\.filter\.noTagsSelected/;
-const clearFilterName = /清空|skillMarket\.filter\.clear/;
+const clearSearchName = /清空搜索|skillMarket\.filter\.clearSearch/;
+const clearTagsName = /清空已选标签|skillMarket\.filter\.clearTags/;
 const publishSkillName = /上架 Skill|skillMarket\.list\.publishSkill/;
 const botPublishName = /Bot 上架|skillMarket\.publishMenu\.botTitle/;
 const manualPublishName = /手动上传|skillMarket\.publishMenu\.manualTitle/;
@@ -179,6 +180,32 @@ describe("SkillListPage", () => {
     );
   });
 
+  it("clears the search input with Escape", async () => {
+    render(<SkillListPage />);
+
+    const searchInput = screen.getByPlaceholderText(searchPlaceholder);
+    fireEvent.change(searchInput, { target: { value: "ci" } });
+    expect(searchInput).toHaveValue("ci");
+
+    fireEvent.keyDown(searchInput, { key: "Escape" });
+
+    expect(searchInput).toHaveValue("");
+  });
+
+  it("uses distinct accessible names for search and tag clear buttons", async () => {
+    render(<SkillListPage />);
+
+    fireEvent.change(screen.getByPlaceholderText(searchPlaceholder), {
+      target: { value: "ci" },
+    });
+    expect(screen.getByRole("button", { name: clearSearchName })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: tagFilterName }));
+    fireEvent.click(await screen.findByRole("option", { name: "纪要" }));
+
+    expect(screen.getByRole("button", { name: clearTagsName })).toBeInTheDocument();
+  });
+
   it("keeps the tag filter open after selecting a tag and clears selected tags", async () => {
     render(<SkillListPage />);
 
@@ -195,7 +222,7 @@ describe("SkillListPage", () => {
     );
     expect(screen.getByText(selectedTagsText)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: clearFilterName }));
+    fireEvent.click(screen.getByRole("button", { name: clearTagsName }));
 
     await waitFor(() => {
       expect(screen.getByRole("option", { name: "纪要" })).toHaveAttribute(

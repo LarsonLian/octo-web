@@ -81,6 +81,26 @@ describe("SkillCard", () => {
     expect(screen.getByRole("button", { name: "ci-helper @CI Bot · @Developer" })).toBeInTheDocument();
   });
 
+  it("does not repeat creator and owner labels when their display names match", () => {
+    render(
+      <SkillCard
+        skill={{
+          ...skill,
+          ownerId: "owner-uid",
+          ownerName: "Owner",
+          creatorId: "creator-uid",
+          creatorName: "Owner",
+        }}
+        categories={categories}
+        onOpen={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("@Owner")).toBeInTheDocument();
+    expect(screen.queryByText("@Owner · @Owner")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ci-helper @Owner" })).toBeInTheDocument();
+  });
+
   it("uses a bot icon instead of @ for bot creators", () => {
     render(
       <SkillCard

@@ -53,7 +53,9 @@
     "noTags": "No matching tags",
     "noTagsSelected": "No tags selected",
     "tagsSelected": "Tags selected",
-    "clear": "Clear"
+    "clear": "Clear",
+    "clearSearch": "Clear search",
+    "clearTags": "Clear selected tags"
   },
   "sort": {
     "ariaLabel": "Skill sort",
@@ -136,6 +138,8 @@
   "upload": {
     "invalidFormat": "Invalid file format",
     "fileTooLarge": "File exceeds 20MB",
+    "iconInvalidFormat": "Icon must be PNG, JPG, or WebP",
+    "iconFileTooLarge": "Icon file exceeds 2MB",
     "dropzoneTitle": "Upload Skill package (.zip / .skill)",
     "dropzoneHint": "The Skill package must contain a SKILL.md file",
     "parseAutofillHint": "The Skill package must contain SKILL.md. Parsed fields will be filled automatically.",
